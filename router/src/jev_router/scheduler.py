@@ -89,7 +89,8 @@ def write_wrapper(home: Path | None = None, repo: Path | None = None) -> Path:
 
 # ---------- per-OS registration ----------
 
-def windows_ps(sched: dict, wrapper: Path, task: str = app.TASK_NAME) -> str:
+def windows_ps(sched: dict, wrapper: Path, task: str | None = None) -> str:
+    task = task or app.task_name()
     hh, mm = sched["time"].split(":")
     at = f"{int(hh):02d}:{int(mm):02d}"
     trigger = (f"New-ScheduledTaskTrigger -Daily -At '{at}'" if sched["cadence"] == "daily" else
@@ -153,13 +154,13 @@ def install(cfg: dict) -> str:
     sched = cfg["schedule"]
     validate(sched)
     wrapper = write_wrapper()
-    stem = app.TASK_NAME.lower()
+    stem = app.task_name().lower()
     if sys.platform == "win32":
         p = subprocess.run(["powershell.exe", "-NoProfile", "-Command", windows_ps(sched, wrapper)],
                            capture_output=True, text=True)
         if p.returncode:
             raise RuntimeError(p.stderr.strip() or p.stdout.strip())
-        return f"Task Scheduler task '{app.TASK_NAME}' runs {describe(sched)}."
+        return f"Task Scheduler task '{app.task_name()}' runs {describe(sched)}."
     if sys.platform == "darwin":
         label = f"com.{stem}"
         plist = Path.home() / "Library/LaunchAgents" / f"{label}.plist"
@@ -182,11 +183,11 @@ def install(cfg: dict) -> str:
 
 
 def remove() -> str:
-    stem = app.TASK_NAME.lower()
+    stem = app.task_name().lower()
     if sys.platform == "win32":
         subprocess.run(["powershell.exe", "-NoProfile", "-Command",
-                        f"Unregister-ScheduledTask -TaskName '{app.TASK_NAME}' -Confirm:$false"], capture_output=True)
-        return f"Removed the Task Scheduler task '{app.TASK_NAME}'."
+                        f"Unregister-ScheduledTask -TaskName '{app.task_name()}' -Confirm:$false"], capture_output=True)
+        return f"Removed the Task Scheduler task '{app.task_name()}'."
     if sys.platform == "darwin":
         plist = Path.home() / "Library/LaunchAgents" / f"com.{stem}.plist"
         subprocess.run(["launchctl", "bootout", f"gui/{os.getuid()}", str(plist)], capture_output=True)

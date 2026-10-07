@@ -51,6 +51,14 @@ def home() -> Path:
     return Path(os.environ.get(HOME_ENV) or Path.home() / HOME_DIRNAME).expanduser()
 
 
+def task_name() -> str:
+    """The schedule's name. A non-default data folder gets its own, so a test install can't replace the real one."""
+    default = Path.home() / HOME_DIRNAME
+    if home().resolve() == default.resolve():
+        return TASK_NAME
+    return f"{TASK_NAME}-" + "".join(c for c in home().name if c.isalnum() or c in "-_").strip("-_")
+
+
 def work() -> Path:
     return home() / "work"
 

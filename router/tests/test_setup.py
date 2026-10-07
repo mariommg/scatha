@@ -87,3 +87,8 @@ def test_secrets_file_is_private(home):
     f = home / "secrets.env"
     assert f.read_text().count("TYPESAFE_API_KEY=") == 1 and "k2" in f.read_text()
     assert oct(f.stat().st_mode)[-3:] == "600"
+
+
+def test_scratch_data_folder_gets_its_own_task(home):
+    assert app.task_name() != app.TASK_NAME and app.task_name().startswith(app.TASK_NAME + "-")
+    assert f"-TaskName '{app.task_name()}'" in scheduler.windows_ps({"cadence": "daily", "time": "01:00"}, home / "run.ps1")
