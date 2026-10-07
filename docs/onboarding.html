@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bookmark Setup Planner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one column of numbered setup steps (they really are a sequence), each a sheet on a cool desk; the answers file builds live at the end. */
+:root {
+  --bg: #eef1f4; --paper: #fbfcfd; --ink: #17202b; --muted: #5b6878; --rule: #d3dae2;
+  --accent: #1f5fbf; --accent-ink: #ffffff; --ok: #1d7a4a; --ok-bg: #e2f4ea; --warn: #9a5b00; --warn-bg: #fff3dc;
+  --code-bg: #e6eaef;
+  --b1: #2f6fd6; --b2: #8a4fc4; --b3: #1f8a6a; --b4: #c2572b; --b5: #9c7a12; --b6: #c23a7a;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Serif 4", Georgia, serif;
+  --mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12171d; --paper: #1a2129; --ink: #e6ebf1; --muted: #9aa7b6; --rule: #2c3640; --accent: #6ea2ff; --accent-ink: #0d1520;
+  --ok: #6fd39d; --ok-bg: #16301f; --warn: #f0b75a; --warn-bg: #3a2c14; --code-bg: #232b34;
+  --b1: #6ea2ff; --b2: #b88cf0; --b3: #5cc9a5; --b4: #f08a5d; --b5: #d9b84a; --b6: #f07ab0; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #12171d; --paper: #1a2129; --ink: #e6ebf1; --muted: #9aa7b6; --rule: #2c3640; --accent: #6ea2ff; --accent-ink: #0d1520;
+  --ok: #6fd39d; --ok-bg: #16301f; --warn: #f0b75a; --warn-bg: #3a2c14; --code-bg: #232b34;
+  --b1: #6ea2ff; --b2: #b88cf0; --b3: #5cc9a5; --b4: #f08a5d; --b5: #d9b84a; --b6: #f07ab0; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--display); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 860px; margin: 0 auto; padding-inline: 16px; padding-block: 32px 96px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; }
+/* minmax(0, 1fr): grid tracks would otherwise grow to the widest preformatted line and push the page sideways */
+.sheet, .topic, .topics, header { grid-template-columns: minmax(0, 1fr); }
+.sheet > *, .wrap > * { min-width: 0; }
+h1, h2, h3 { font-family: var(--display); margin: 0; text-wrap: balance; }
+h1 { font-size: 32px; letter-spacing: -0.01em; }
+h2 { font-size: 20px; display: flex; gap: 10px; align-items: baseline; }
+h2 .n { font-family: var(--mono); font-size: 14px; color: var(--accent); }
+p { margin: 0; }
+.prose { font-family: var(--body); font-size: 16px; max-width: 65ch; }
+.muted { color: var(--muted); }
+.eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+code, .mono { font-family: var(--mono); font-size: 13px; }
+code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+a { color: var(--accent); }
+.sheet { background: var(--paper); border: 1px solid var(--rule); border-radius: 10px; padding: 20px; display: grid; gap: 14px; min-width: 0; }
+.promise { background: var(--ok-bg); color: var(--ok); border-radius: 8px; padding: 10px 14px; font-size: 14px; }
+.warnbox { background: var(--warn-bg); color: var(--warn); border-radius: 8px; padding: 10px 14px; font-size: 14px; }
+.checks { display: grid; gap: 8px; }
+.checks label { display: flex; gap: 10px; align-items: flex-start; font-family: var(--body); font-size: 15px; cursor: pointer; }
+.checks input { margin-top: 4px; accent-color: var(--accent); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.chip.tuned::after { content: " ✓"; color: var(--ok); }
+.chip[aria-pressed="true"].tuned::after { color: var(--bg); }
+.topics { display: grid; gap: 10px; }
+.topic { border: 1px solid var(--rule); border-left: 4px solid var(--c); border-radius: 8px; padding: 12px; display: grid; gap: 8px; background: var(--bg); min-width: 0; }
+.topic .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+input[type=text], input[type=number], input[type=time], select, textarea {
+  font: inherit; color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 7px 9px; min-width: 0; }
+textarea { width: 100%; min-height: 64px; font-family: var(--body); resize: vertical; }
+.topic input.name { font-weight: 700; flex: 1 1 160px; }
+.topic .dest { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 8px; }
+.topic .dest label, .field label { font-size: 12px; color: var(--muted); display: grid; gap: 3px; }
+.btn { font: inherit; font-size: 14px; padding: 8px 14px; border-radius: 6px; border: 1px solid var(--rule); background: var(--paper); color: var(--ink); cursor: pointer; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.btn.small { font-size: 12px; padding: 4px 9px; color: var(--muted); }
+.radios { display: grid; gap: 8px; }
+.radios label { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 8px; cursor: pointer; }
+.radios label:has(input:checked) { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.radios input { margin-top: 4px; accent-color: var(--accent); }
+.radios b { display: block; }
+.fields { display: flex; flex-wrap: wrap; gap: 12px; }
+.field { display: grid; gap: 3px; }
+.sentence { font-family: var(--body); font-size: 17px; }
+.tree { font-family: var(--mono); font-size: 13px; background: var(--code-bg); border-radius: 8px; padding: 12px; overflow-x: auto; white-space: pre; }
+.out { font-family: var(--mono); font-size: 12.5px; background: var(--code-bg); border-radius: 8px; padding: 12px; overflow-x: auto; white-space: pre; max-height: 360px; }
+.cmd { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cmd code { flex: 1 1 280px; padding: 8px 10px; font-size: 13px; }
+.os { display: inline-flex; border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+.os button { font: inherit; font-size: 13px; padding: 5px 12px; border: 0; background: var(--paper); color: var(--ink); cursor: pointer; }
+.os button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+td { border-top: 1px solid var(--rule); padding: 8px 6px; vertical-align: top; }
+td:first-child { width: 42%; }
+.tablewrap { overflow-x: auto; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 560px) { .topic .dest { grid-template-columns: 1fr; } h1 { font-size: 26px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header style="display:grid;gap:10px">
+    <span class="eyebrow">smaug-jev · setup planner</span>
+    <h1>Bookmark Setup Planner</h1>
+    <p class="prose">You save things on X because they matter to you, and then (if you're like me) you never see them again. This sets up a small machine that pulls your bookmarks on a schedule, sorts each one into topics you choose, and writes it up as a note in your Obsidian vault or any folder you like.</p>
+    <p class="prose">Plan the setup here, download one file, and the setup wizard takes it from there.</p>
+    <p class="promise">This page never asks for a password, cookie, or API key. The wizard asks for those in hidden prompts on your own computer, checks each one, and stores it there.</p>
+  </header>
+
+  <section class="sheet" aria-labelledby="h1s">
+    <h2 id="h1s"><span class="n">01</span>Before you start</h2>
+    <p class="muted">Tick these off as you go. (They're remembered in this browser only.)</p>
+    <div class="checks" id="checks"></div>
+  </section>
+
+  <section class="sheet" aria-labelledby="h2s">
+    <h2 id="h2s"><span class="n">02</span>Topics and where they go</h2>
+    <p class="prose">Every bookmark goes to the topic it fits best. One that fits none of them gets skipped, which is a feature: it's how the junk stays out of your vault.</p>
+    <p class="muted">Start from a preset or two. The ones with a ✓ were tuned against real review answers; the rest get sharpened by the wizard.</p>
+    <div class="chips" id="presets"></div>
+    <div class="field" style="max-width:560px">
+      <label for="vault">Default folder: your Obsidian vault, or any folder (topics go in subfolders under it)</label>
+      <input type="text" id="vault" placeholder="C:\Users\you\Documents\My Vault   or   ~/Notes">
+    </div>
+    <div class="topics" id="topics"></div>
+    <div><button class="btn" type="button" id="addTopic">+ Add your own topic</button></div>
+    <div>
+      <p class="eyebrow" style="margin-bottom:6px">Where notes will land</p>
+      <div class="tree" id="tree"></div>
+    </div>
+  </section>
+
+  <section class="sheet" aria-labelledby="h3s">
+    <h2 id="h3s"><span class="n">03</span>Who writes the notes</h2>
+    <p class="prose">Claude Haiku reads each bookmark (threads, linked articles, even text in images) and writes the note: a summary, the key points, a quote or two, and a how-to when a post shares a recipe or tool.</p>
+    <div class="radios" role="radiogroup" aria-label="Note writer">
+      <label><input type="radio" name="backend" value="claude-code" checked><span><b>Claude Code, headless</b><span class="muted">Uses your Claude subscription; nothing extra to buy. For one Pro user, 100 notes used about a quarter of a 5-hour window.</span></span></label>
+      <label><input type="radio" name="backend" value="anthropic-api"><span><b>Anthropic API key</b><span class="muted">Pay as you go, roughly a cent per note. Good if you don't use Claude Code or want to keep its usage for coding.</span></span></label>
+    </div>
+    <div class="field"><label for="reader">One sentence about you (optional): how-to steps get tailored to it</label>
+      <input type="text" id="reader" placeholder="I work in Claude Code on Windows 11 and keep notes in Obsidian."></div>
+  </section>
+
+  <section class="sheet" aria-labelledby="h4s">
+    <h2 id="h4s"><span class="n">04</span>When it runs</h2>
+    <div class="fields">
+      <div class="field"><label for="cadence">How often</label>
+        <select id="cadence"><option value="weekly" selected>Weekly</option><option value="biweekly">Every other week</option><option value="daily">Daily</option></select></div>
+      <div class="field" id="dayField"><label for="day">Day</label>
+        <select id="day"></select></div>
+      <div class="field"><label for="time">Time (24-hour)</label><input type="time" id="time" value="00:01"></div>
+      <div class="field"><label for="batch">Bookmarks per run</label><input type="number" id="batch" min="5" max="500" step="5" value="100"></div>
+      <div class="field"><label for="ntfy">Phone ping via ntfy (optional topic)</label><input type="text" id="ntfy" placeholder="something-hard-to-guess"></div>
+    </div>
+    <p class="sentence" id="sentence"></p>
+    <p class="muted">Got a big backlog? Each run takes up to that many unprocessed bookmarks, newest first, so the backlog clears a batch per run. The computer needs to be on with you logged in (a locked screen is fine); if it's asleep, it wakes, and if it's off, the run happens at your next login.</p>
+  </section>
+
+  <section class="sheet" aria-labelledby="h5s">
+    <h2 id="h5s"><span class="n">05</span>Run the wizard</h2>
+    <p class="prose">Save your plan, then run setup with it. The wizard checks your tools, asks for your X cookies and keys (hidden), confirms each one works, installs the schedule, and offers a five-bookmark test drive into a preview folder.</p>
+    <div class="cmd">
+      <button class="btn primary" type="button" id="download">Download my-setup.json</button>
+      <button class="btn" type="button" id="copyJson">Copy it instead</button>
+      <span class="muted" id="dlNote" aria-live="polite"></span>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <span class="muted">Your computer:</span>
+      <span class="os" role="group" aria-label="Operating system">
+        <button type="button" data-os="win" aria-pressed="true">Windows</button>
+        <button type="button" data-os="mac" aria-pressed="false">macOS</button>
+        <button type="button" data-os="linux" aria-pressed="false">Linux</button>
+      </span>
+    </div>
+    <div class="cmd"><code id="cmd"></code><button class="btn small" type="button" id="copyCmd">Copy</button></div>
+    <p class="muted">Run it from the folder you downloaded the project to, and point <code>--answers</code> at wherever my-setup.json landed.</p>
+    <details>
+      <summary class="muted" style="cursor:pointer">What's in the file</summary>
+      <div class="out" id="out"></div>
+    </details>
+  </section>
+
+  <section class="sheet" aria-labelledby="h6s">
+    <h2 id="h6s"><span class="n">06</span>Later on</h2>
+    <div class="tablewrap"><table id="later"></table></div>
+    <p class="muted">The runbook (<code>docs/RUNBOOK.md</code>) has the rest: logs, costs, what to do when something breaks.</p>
+  </section>
+</div>
+
+<script>
+(() => {
+  const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  // Mirrors router/src/jev_router/topics.py PRESETS. "tuned" = the wizard uses tested definitions as-is.
+  const PRESETS = [
+    { label: "AI", tuned: true, description: "Language models, AI tools and products, agents, prompting, coding with AI assistants, AI research, and AI's effects on work." },
+    { label: "Knowledge work", tuned: true, description: "How people learn, research, write, take notes, decide, manage attention, and build careers in thinking work." },
+    { label: "General knowledge", tuned: true, description: "Facts, ideas, and insights worth remembering: science, math, history, markets, how things work." },
+    { label: "Life hacks", tuned: true, description: "Practical advice and tools for a more focused, satisfying personal life: habits, health, money, relationships." },
+    { label: "Journalism", tuned: true, description: "Reported, in-depth work about real events or people: investigations, features, first-hand accounts." },
+    { label: "Programming", description: "Writing software: languages, libraries, tools, debugging, architecture, and the craft of code." },
+    { label: "Science", description: "Research findings, discoveries, and explanations from the natural and social sciences." },
+    { label: "History", description: "Stories, sources, and analysis about the past." },
+    { label: "Investing", description: "Markets, investing strategies, companies, and personal finance decisions." },
+    { label: "Design", description: "Visual, product, and interaction design: examples, principles, and tools." },
+    { label: "Health", description: "Fitness, nutrition, sleep, and medical findings someone could act on." },
+    { label: "Cooking", description: "Recipes, techniques, and food knowledge." },
+  ];
+  const CHECKS = [
+    ["node", "Node.js 22 or newer installed (nodejs.org)"],
+    ["uv", "uv installed (the setup script prints the one-line install if it's missing)"],
+    ["x", "Logged in to x.com in your browser (the wizard walks you through copying two cookies)"],
+    ["typesafe", "A TypeSafe API key for Jev, the sorter (typesafe.ai; a few cents covers hundreds of bookmarks)"],
+    ["claude", "Claude Code installed and logged in, or an Anthropic API key (pick in step 03)"],
+    ["obsidian", "Obsidian, if you want notes in a vault (optional: plain folders work too)"],
+  ];
+  const LATER = [
+    ["X logged you out, or the run summary says the login expired", "setup x-login"],
+    ["Change topics, wording, or folders", "setup topics   (or edit topics.yaml in your data folder)"],
+    ["Change when it runs or the batch size", "setup schedule"],
+    ["See what's set up and the newest log", "setup status"],
+    ["Run it right now instead of waiting", "the run command in the runbook"],
+    ["Stop the schedule", "setup unschedule"],
+  ];
+
+  const $ = s => document.querySelector(s);
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem("bsp:" + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem("bsp:" + k, JSON.stringify(v)); } catch {} },
+  };
+  const el = (tag, attrs = {}, ...kids) => {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+      else if (k === "class") n.className = v;
+      else if (v !== false && v != null) n.setAttribute(k, v === true ? "" : v);
+    }
+    for (const c of kids.flat()) if (c != null) n.append(c.nodeType ? c : String(c));
+    return n;
+  };
+
+  // ---- state ----
+  let state = store.get("plan", null) || {
+    vault: "", topics: [], backend: "claude-code",
+    schedule: { cadence: "weekly", day: "Saturday", time: "00:01" }, batch: 100, ntfy: "", reader: "", os: guessOS(),
+  };
+  function guessOS() { const p = navigator.platform || navigator.userAgent; return /Mac/i.test(p) ? "mac" : /Linux|X11/i.test(p) ? "linux" : "win"; }
+  const save = () => { store.set("plan", state); render(); };
+  const sep = () => (state.os === "win" ? "\\" : "/");
+  const join = (a, b) => !a ? b : !b ? a : a.replace(/[\\/]+$/, "") + sep() + b;
+  // Blank when there's no folder yet: the wizard then offers your Obsidian vaults.
+  const destOf = t => t.destination || (state.vault ? join(state.vault, t.sub ?? t.label) : "");
+
+  // ---- checks ----
+  const checked = store.get("checks", {});
+  $("#checks").append(...CHECKS.map(([k, text]) => el("label", {},
+    el("input", { type: "checkbox", id: "c-" + k, checked: !!checked[k] || false, onchange: e => { checked[k] = e.target.checked; store.set("checks", checked); } }),
+    el("span", {}, text))));
+
+  // ---- topics ----
+  function addTopic(label, description, preset) {
+    if (state.topics.some(t => t.label.toLowerCase() === label.toLowerCase())) return;
+    state.topics.push({ label, description, preset: !!preset, sub: label });
+    save();
+  }
+  function renderPresets() {
+    $("#presets").replaceChildren(...PRESETS.map(p => {
+      const on = state.topics.some(t => t.label === p.label);
+      return el("button", { type: "button", class: "chip" + (p.tuned ? " tuned" : ""), "aria-pressed": String(on),
+        onclick: () => { on ? (state.topics = state.topics.filter(t => t.label !== p.label), save()) : addTopic(p.label, p.description, true); } }, p.label);
+    }));
+  }
+  function renderTopics() {
+    const box = $("#topics");
+    const active = document.activeElement?.id, caret = document.activeElement?.selectionStart;
+    if (!state.topics.length) { box.replaceChildren(el("p", { class: "muted" }, "No topics yet. Tap a preset above or add your own.")); return; }
+    box.replaceChildren(...state.topics.map((t, i) => el("div", { class: "topic", style: `--c: var(--b${(i % 6) + 1})` },
+      el("div", { class: "row" },
+        el("input", { type: "text", class: "name", id: `tn-${i}`, value: t.label, "aria-label": "Topic name",
+          oninput: e => { t.label = e.target.value; t.preset = PRESETS.some(p => p.tuned && p.label === t.label) && t.preset; store.set("plan", state); renderTree(); renderOut(); renderPresets(); } }),
+        el("button", { type: "button", class: "btn small", onclick: () => { state.topics.splice(i, 1); save(); } }, "Remove")),
+      el("textarea", { id: `td-${i}`, "aria-label": "What belongs here", placeholder: "In one line, what belongs here?",
+        oninput: e => { t.description = e.target.value; t.preset = false; store.set("plan", state); renderOut(); } }, t.description),
+      el("div", { class: "dest" },
+        el("label", {}, "Folder (blank = default folder above)",
+          el("input", { type: "text", id: `tf-${i}`, value: t.base || "", placeholder: state.vault || "default folder",
+            oninput: e => { t.base = e.target.value; t.destination = t.base ? join(t.base, t.sub) : ""; store.set("plan", state); renderTree(); renderOut(); } })),
+        el("label", {}, "Subfolder",
+          el("input", { type: "text", id: `ts-${i}`, value: t.sub ?? t.label,
+            oninput: e => { t.sub = e.target.value; t.destination = t.base ? join(t.base, t.sub) : ""; store.set("plan", state); renderTree(); renderOut(); } }))))));
+    if (active) { const f = document.getElementById(active); if (f) { f.focus(); try { f.setSelectionRange(caret, caret); } catch {} } }
+  }
+  function renderTree() {
+    if (!state.topics.length) { $("#tree").textContent = "(add a topic to see this)"; return; }
+    const groups = {};
+    for (const t of state.topics) {
+      const d = destOf(t) || join("(the wizard will ask)", t.sub ?? t.label), cut = Math.max(d.lastIndexOf("\\"), d.lastIndexOf("/"));
+      (groups[d.slice(0, cut) || d] ||= []).push(d.slice(cut + 1) + "   ← " + t.label);
+    }
+    $("#tree").textContent = Object.entries(groups).map(([root, kids]) =>
+      root + "\n" + kids.map((k, i) => (i === kids.length - 1 ? "└─ " : "├─ ") + k).join("\n")).join("\n\n");
+  }
+  $("#addTopic").addEventListener("click", () => {
+    let n = 1; while (state.topics.some(t => t.label === `New topic ${n}`)) n++;
+    addTopic(`New topic ${n}`, "", false);
+    setTimeout(() => { const f = document.getElementById(`tn-${state.topics.length - 1}`); f && (f.focus(), f.select()); });
+  });
+  $("#vault").value = state.vault;
+  $("#vault").addEventListener("input", e => { state.vault = e.target.value; store.set("plan", state); renderTree(); renderOut(); });
+
+  // ---- backend, schedule ----
+  document.querySelectorAll('input[name=backend]').forEach(r => { r.checked = r.value === state.backend;
+    r.addEventListener("change", () => { state.backend = r.value; save(); }); });
+  $("#day").append(...DAYS.map(d => el("option", { value: d, selected: d === state.schedule.day }, d)));
+  $("#cadence").value = state.schedule.cadence; $("#time").value = state.schedule.time;
+  $("#batch").value = state.batch; $("#ntfy").value = state.ntfy; $("#reader").value = state.reader || "";
+  $("#reader").addEventListener("input", e => { state.reader = e.target.value; store.set("plan", state); renderOut(); });
+  $("#cadence").addEventListener("change", e => { state.schedule.cadence = e.target.value; save(); });
+  $("#day").addEventListener("change", e => { state.schedule.day = e.target.value; save(); });
+  $("#time").addEventListener("change", e => { state.schedule.time = e.target.value || "00:01"; save(); });
+  $("#batch").addEventListener("change", e => { state.batch = Math.max(5, Math.min(500, +e.target.value || 100)); save(); });
+  $("#ntfy").addEventListener("input", e => { state.ntfy = e.target.value.trim(); store.set("plan", state); renderOut(); });
+
+  function nextRun() {
+    const s = state.schedule, [hh, mm] = s.time.split(":").map(Number), now = new Date();
+    for (let i = 0; i < 15; i++) {
+      const d = new Date(now); d.setDate(now.getDate() + i); d.setHours(hh, mm, 0, 0);
+      if (d > now && (s.cadence === "daily" || DAYS[d.getDay()] === s.day)) return d;
+    }
+  }
+  function renderSchedule() {
+    const s = state.schedule;
+    $("#dayField").hidden = s.cadence === "daily";
+    const when = s.cadence === "daily" ? `every day at ${s.time}` : `${s.cadence === "biweekly" ? "every other" : "every"} ${s.day} at ${s.time}`;
+    const n = nextRun();
+    $("#sentence").textContent = `It'll run ${when}, taking up to ${state.batch} bookmarks each time.` +
+      (n ? ` The first one would be ${n.toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}.` : "");
+  }
+
+  // ---- output ----
+  function answers() {
+    return {
+      _about: "Answers for the smaug-jev setup wizard. No secrets in here, on purpose.",
+      topics: state.topics.filter(t => t.label.trim()).map(t => ({
+        label: t.label.trim(), description: (t.description || "").trim(), preset: !!t.preset, destination: destOf(t) })),
+      draft_definitions: true,
+      notes_backend: state.backend,
+      schedule: state.schedule.cadence === "daily" ? { cadence: "daily", time: state.schedule.time } : { ...state.schedule },
+      batch_size: state.batch,
+      ntfy_topic: state.ntfy,
+      reader_profile: (state.reader || "").trim(),
+    };
+  }
+  const json = () => JSON.stringify(answers(), null, 2);
+  function renderOut() {
+    $("#out").textContent = json();
+    const cmd = { win: ".\\setup.ps1 --answers $HOME\\Downloads\\my-setup.json",
+                  mac: "./setup.sh --answers ~/Downloads/my-setup.json",
+                  linux: "./setup.sh --answers ~/Downloads/my-setup.json" }[state.os];
+    $("#cmd").textContent = cmd;
+    document.querySelectorAll(".os button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.os === state.os)));
+  }
+  document.querySelectorAll(".os button").forEach(b => b.addEventListener("click", () => { state.os = b.dataset.os; save(); }));
+  function problems() {
+    const a = answers();
+    if (!a.topics.length) return "Add at least one topic first.";
+    const blank = a.topics.find(t => !t.preset && !t.description);
+    if (blank) return `Give "${blank.label}" a one-line description first.`;
+    return "";
+  }
+  $("#download").addEventListener("click", () => {
+    const p = problems(); if (p) { $("#dlNote").textContent = p; return; }
+    const url = URL.createObjectURL(new Blob([json() + "\n"], { type: "application/json" }));
+    const a = el("a", { href: url, download: "my-setup.json" }); document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    $("#dlNote").textContent = "Saved. Check your Downloads folder.";
+  });
+  async function copy(text, note) {
+    try { await navigator.clipboard.writeText(text); note.textContent = "Copied."; }
+    catch { note.textContent = "Couldn't reach the clipboard; select the text and copy it."; }
+  }
+  $("#copyJson").addEventListener("click", () => { const p = problems(); if (p) { $("#dlNote").textContent = p; return; } copy(json(), $("#dlNote")); });
+  $("#copyCmd").addEventListener("click", () => copy($("#cmd").textContent, $("#dlNote")));
+
+  $("#later").append(...LATER.map(([when, what]) => el("tr", {}, el("td", {}, when), el("td", {}, el("code", {}, what)))));
+
+  function render() { renderPresets(); renderTopics(); renderTree(); renderSchedule(); renderOut(); }
+  render();
+})();
+</script>
+</body>
+</html>

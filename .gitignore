@@ -1,0 +1,18 @@
+# Personal data and per-install files never go in the repo
+work/
+weekly.config.json
+run-weekly.ps1
+my-setup.json
+*.env
+.smaug-upstream.git/
+
+# Vendored Smaug: its own runtime files
+smaug/smaug.config.json
+smaug/.state/
+smaug/node_modules/
+
+# Python / uv
+router/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/

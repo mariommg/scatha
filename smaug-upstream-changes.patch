@@ -1,0 +1,678 @@
+diff --git a/package-lock.json b/package-lock.json
+index 63c027a..ee0bc22 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -9,7 +9,9 @@
+       "version": "0.3.1",
+       "license": "MIT",
+       "dependencies": {
+-        "dayjs": "^1.11.10"
++        "@mozilla/readability": "^0.6.0",
++        "dayjs": "^1.11.10",
++        "linkedom": "^0.18.13"
+       },
+       "bin": {
+         "smaug": "src/cli.js"
+@@ -19,11 +21,301 @@
+         "node": ">=20"
+       }
+     },
++    "node_modules/@mozilla/readability": {
++      "version": "0.6.0",
++      "resolved": "https://registry.npmjs.org/@mozilla/readability/-/readability-0.6.0.tgz",
++      "integrity": "sha512-juG5VWh4qAivzTAeMzvY9xs9HY5rAcr2E4I7tiSSCokRFi7XIZCAu92ZkSTsIj1OPceCifL3cpfteP3pDT9/QQ==",
++      "license": "Apache-2.0",
++      "engines": {
++        "node": ">=14.0.0"
++      }
++    },
++    "node_modules/boolbase": {
++      "version": "2.0.0",
++      "resolved": "https://registry.npmjs.org/boolbase/-/boolbase-2.0.0.tgz",
++      "integrity": "sha512-DkVaaQHymRhpYEYo9x1oo7Q7B0Y6KJUsjm3c9eTyFDby4MHLBTwZ6ZDWBel5zrYxj1WsZgC5oLpiz+93MluXeA==",
++      "license": "ISC",
++      "engines": {
++        "node": ">=20.19.0"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/fb55"
++      }
++    },
++    "node_modules/css-select": {
++      "version": "7.0.0",
++      "resolved": "https://registry.npmjs.org/css-select/-/css-select-7.0.0.tgz",
++      "integrity": "sha512-snmjEVXy+1LnwXdxhYvTMj1d9tOh4HxkA1YmoayVBeeyR2C14Pum7fcxJIm4SswYspVy866eYNwlH6xC3/VH5g==",
++      "license": "BSD-2-Clause",
++      "dependencies": {
++        "boolbase": "^2.0.0",
++        "css-what": "^8.0.0",
++        "domhandler": "^6.0.1",
++        "domutils": "^4.0.2",
++        "nth-check": "^3.0.1"
++      },
++      "engines": {
++        "node": ">=20.19.0"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/fb55"
++      }
++    },
++    "node_modules/css-what": {
++      "version": "8.0.0",
++      "resolved": "https://registry.npmjs.org/css-what/-/css-what-8.0.0.tgz",
++      "integrity": "sha512-DH0Bqq3DNp5tdOReuNyAA+Ev4Y2GS5FMbZpeTLP6C4CDi0h5nL0BmUPChXw3o/qbHLDWHl49sbNqQVY7bMSDdw==",
++      "license": "BSD-2-Clause",
++      "engines": {
++        "node": ">=20.19.0"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/sponsors/fb55"
++      }
++    },
++    "node_modules/cssom": {
++      "version": "0.5.0",
++      "resolved": "https://registry.npmjs.org/cssom/-/cssom-0.5.0.tgz",
++      "integrity": "sha512-iKuQcq+NdHqlAcwUY0o/HL69XQrUaQdMjmStJ8JFmUaiiQErlhrmuigkg/CU4E2J0IyUKUrMAgl36TvN67MqTw==",
++      "license": "MIT"
++    },
+     "node_modules/dayjs": {
+       "version": "1.11.19",
+       "resolved": "https://registry.npmjs.org/dayjs/-/dayjs-1.11.19.tgz",
+       "integrity": "sha512-t5EcLVS6QPBNqM2z8fakk/NKel+Xzshgt8FFKAn+qwlD1pzZWxh0nVCrvFK7ZDb6XucZeF9z8C7CBWTRIVApAw==",
+       "license": "MIT"
++    },
++    "node_modules/dom-serializer": {
++      "version": "3.1.1",
++      "resolved": "https://registry.npmjs.org/dom-serializer/-/dom-serializer-3.1.1.tgz",
++      "integrity": "sha512-4MEa38/QexBob6gFNwu+EGdWvhJ1OKuNwdYY3Y3NyeWDQfnGeDYQUDfIRzWu5B5gsv03so2Uxd28YC6zrsx3Lw==",
++      "license": "MIT",
++      "dependencies": {
++        "domelementtype": "^3.0.0",
++        "domhandler": "^6.0.0",
++        "entities": "^8.0.0"
++      },
++      "engines": {
++        "node": ">=20.19.0"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/cheeriojs/dom-serializer?sponsor=1"
++      }
++    },
++    "node_modules/domelementtype": {
++      "version": "3.0.0",
++      "resolved": "https://registry.npmjs.org/domelementtype/-/domelementtype-3.0.0.tgz",
++      "integrity": "sha512-umCQid3jKbDmVjx8jGaW7uUykm4DEUeyV21hPxNMo2nV955DhUThwqyOIDtreepP31hl84X7G5U9ZfsWvIB3Pg==",
++      "funding": [
++        {
++          "type": "github",
++          "url": "https://github.com/sponsors/fb55"
++        }
++      ],
++      "license": "BSD-2-Clause",
++      "engines": {
++        "node": ">=20.19.0"
++      }
++    },
++    "node_modules/domhandler": {
++      "version": "6.0.1",
++      "resolved": "https://registry.npmjs.org/domhandler/-/domhandler-6.0.1.tgz",
++      "integrity": "sha512-gYzvtM72ZtxQO0T048kd6HWSbbGCNOUwcnfQ01cqIJ4X2IYKFFHZ5mKvrQETcFXxsRObZulDaKmy//R7TPtsBg==",
++      "license": "BSD-2-Clause",
++      "dependencies": {
++        "domelementtype": "^3.0.0"
++      },
++      "engines": {
++        "node": ">=20.19.0"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/fb55/domhandler?sponsor=1"
++      }
++    },
++    "node_modules/domutils": {
++      "version": "4.0.2",
++      "resolved": "https://registry.npmjs.org/domutils/-/domutils-4.0.2.tgz",
++      "integrity": "sha512-qI4JLRKnSzqFqr7hAlS5xQDusBCjKSEG4t4+7aNrIQMHBcsC2TGEhuyABJdYkgSewL57PNLYEiibY2iPKhKpaA==",
++      "license": "BSD-2-Clause",
++      "dependencies": {
++        "dom-serializer": "^3.0.0",
++        "domelementtype": "^3.0.0",
++        "domhandler": "^6.0.0"
++      },
++      "engines": {
++        "node": ">=20.19.0"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/fb55/domutils?sponsor=1"
++      }
++    },
++    "node_modules/entities": {
++      "version": "8.1.0",
++      "resolved": "https://registry.npmjs.org/entities/-/entities-8.1.0.tgz",
++      "integrity": "sha512-kxL7msIffSuh9aaFAMD7rxAIuTRMAHMeBtgHW2yUdWw732ZNh4MehkF2gdjvtdmikkaIP9bFDDJOPlsvm7avrA==",
++      "license": "BSD-2-Clause",
++      "engines": {
++        "node": ">=20.19.0"
++      },
++      "funding": {
++        "url": "https://github.com/fb55/entities?sponsor=1"
++      }
++    },
++    "node_modules/html-escaper": {
++      "version": "3.0.3",
++      "resolved": "https://registry.npmjs.org/html-escaper/-/html-escaper-3.0.3.tgz",
++      "integrity": "sha512-RuMffC89BOWQoY0WKGpIhn5gX3iI54O6nRA0yC124NYVtzjmFWBIiFd8M0x+ZdX0P9R4lADg1mgP8C7PxGOWuQ==",
++      "license": "MIT"
++    },
++    "node_modules/htmlparser2": {
++      "version": "10.1.0",
++      "resolved": "https://registry.npmjs.org/htmlparser2/-/htmlparser2-10.1.0.tgz",
++      "integrity": "sha512-VTZkM9GWRAtEpveh7MSF6SjjrpNVNNVJfFup7xTY3UpFtm67foy9HDVXneLtFVt4pMz5kZtgNcvCniNFb1hlEQ==",
++      "funding": [
++        "https://github.com/fb55/htmlparser2?sponsor=1",
++        {
++          "type": "github",
++          "url": "https://github.com/sponsors/fb55"
++        }
++      ],
++      "license": "MIT",
++      "dependencies": {
++        "domelementtype": "^2.3.0",
++        "domhandler": "^5.0.3",
++        "domutils": "^3.2.2",
++        "entities": "^7.0.1"
++      }
++    },
++    "node_modules/htmlparser2/node_modules/dom-serializer": {
++      "version": "2.0.0",
++      "resolved": "https://registry.npmjs.org/dom-serializer/-/dom-serializer-2.0.0.tgz",
++      "integrity": "sha512-wIkAryiqt/nV5EQKqQpo3SToSOV9J0DnbJqwK7Wv/Trc92zIAYZ4FlMu+JPFW1DfGFt81ZTCGgDEabffXeLyJg==",
++      "license": "MIT",
++      "dependencies": {
++        "domelementtype": "^2.3.0",
++        "domhandler": "^5.0.2",
++        "entities": "^4.2.0"
++      },
++      "funding": {
++        "url": "https://github.com/cheeriojs/dom-serializer?sponsor=1"
++      }
++    },
++    "node_modules/htmlparser2/node_modules/dom-serializer/node_modules/entities": {
++      "version": "4.5.0",
++      "resolved": "https://registry.npmjs.org/entities/-/entities-4.5.0.tgz",
++      "integrity": "sha512-V0hjH4dGPh9Ao5p0MoRY6BVqtwCjhz6vI5LT8AJ55H+4g9/4vbHx1I54fS0XuclLhDHArPQCiMjDxjaL8fPxhw==",
++      "license": "BSD-2-Clause",
++      "engines": {
++        "node": ">=0.12"
++      },
++      "funding": {
++        "url": "https://github.com/fb55/entities?sponsor=1"
++      }
++    },
++    "node_modules/htmlparser2/node_modules/domelementtype": {
++      "version": "2.3.0",
++      "resolved": "https://registry.npmjs.org/domelementtype/-/domelementtype-2.3.0.tgz",
++      "integrity": "sha512-OLETBj6w0OsagBwdXnPdN0cnMfF9opN69co+7ZrbfPGrdpPVNBUj02spi6B1N7wChLQiPn4CSH/zJvXw56gmHw==",
++      "funding": [
++        {
++          "type": "github",
++          "url": "https://github.com/sponsors/fb55"
++        }
++      ],
++      "license": "BSD-2-Clause"
++    },
++    "node_modules/htmlparser2/node_modules/domhandler": {
++      "version": "5.0.3",
++      "resolved": "https://registry.npmjs.org/domhandler/-/domhandler-5.0.3.tgz",
++      "integrity": "sha512-cgwlv/1iFQiFnU96XXgROh8xTeetsnJiDsTc7TYCLFd9+/WNkIqPTxiM/8pSd8VIrhXGTf1Ny1q1hquVqDJB5w==",
++      "license": "BSD-2-Clause",
++      "dependencies": {
++        "domelementtype": "^2.3.0"
++      },
++      "engines": {
++        "node": ">= 4"
++      },
++      "funding": {
++        "url": "https://github.com/fb55/domhandler?sponsor=1"
++      }
++    },
++    "node_modules/htmlparser2/node_modules/domutils": {
++      "version": "3.2.2",
++      "resolved": "https://registry.npmjs.org/domutils/-/domutils-3.2.2.tgz",
++      "integrity": "sha512-6kZKyUajlDuqlHKVX1w7gyslj9MPIXzIFiz/rGu35uC1wMi+kMhQwGhl4lt9unC9Vb9INnY9Z3/ZA3+FhASLaw==",
++      "license": "BSD-2-Clause",
++      "dependencies": {
++        "dom-serializer": "^2.0.0",
++        "domelementtype": "^2.3.0",
++        "domhandler": "^5.0.3"
++      },
++      "funding": {
++        "url": "https://github.com/fb55/domutils?sponsor=1"
++      }
++    },
++    "node_modules/htmlparser2/node_modules/entities": {
++      "version": "7.0.1",
++      "resolved": "https://registry.npmjs.org/entities/-/entities-7.0.1.tgz",
++      "integrity": "sha512-TWrgLOFUQTH994YUyl1yT4uyavY5nNB5muff+RtWaqNVCAK408b5ZnnbNAUEWLTCpum9w6arT70i1XdQ4UeOPA==",
++      "license": "BSD-2-Clause",
++      "engines": {
++        "node": ">=0.12"
++      },
++      "funding": {
++        "url": "https://github.com/fb55/entities?sponsor=1"
++      }
++    },
++    "node_modules/linkedom": {
++      "version": "0.18.13",
++      "resolved": "https://registry.npmjs.org/linkedom/-/linkedom-0.18.13.tgz",
++      "integrity": "sha512-ES/o9qotMpzpN2MHs+Iq/JcVoOj8Fa5wiQYrTdFpvAnwXL0g66XHHUc9WUMk6nAlBtGsFQ24ne+SYnvnaQ2FSw==",
++      "license": "ISC",
++      "dependencies": {
++        "css-select": "^7.0.0",
++        "cssom": "^0.5.0",
++        "html-escaper": "^3.0.3",
++        "htmlparser2": "^10.1.0",
++        "uhyphen": "^0.2.0"
++      },
++      "engines": {
++        "node": ">=16"
++      },
++      "peerDependencies": {
++        "canvas": ">= 2"
++      },
++      "peerDependenciesMeta": {
++        "canvas": {
++          "optional": true
++        }
++      }
++    },
++    "node_modules/nth-check": {
++      "version": "3.0.1",
++      "resolved": "https://registry.npmjs.org/nth-check/-/nth-check-3.0.1.tgz",
++      "integrity": "sha512-GX0gsdbGVCgnRgbeGaubfjpBXyYRWOOCVeYh08bSQvDZqxz5ndXs1OTfAt/h36G1xvI94YIspsI0sVFqAV9+RQ==",
++      "license": "BSD-2-Clause",
++      "dependencies": {
++        "boolbase": "^2.0.0"
++      },
++      "engines": {
++        "node": ">=20.19.0"
++      },
++      "funding": {
++        "type": "github",
++        "url": "https://github.com/fb55/nth-check?sponsor=1"
++      }
++    },
++    "node_modules/uhyphen": {
++      "version": "0.2.0",
++      "resolved": "https://registry.npmjs.org/uhyphen/-/uhyphen-0.2.0.tgz",
++      "integrity": "sha512-qz3o9CHXmJJPGBdqzab7qAYuW8kQGKNEuoHFYrBwV6hWIMcpAmxDLXojcHfFr9US1Pe6zUswEIJIbLI610fuqA==",
++      "license": "ISC"
+     }
+   }
+ }
+diff --git a/package.json b/package.json
+index a12288d..bf44b1f 100644
+--- a/package.json
++++ b/package.json
+@@ -24,9 +24,10 @@
+   "author": "",
+   "license": "MIT",
+   "dependencies": {
+-    "dayjs": "^1.11.10"
++    "@mozilla/readability": "^0.6.0",
++    "dayjs": "^1.11.10",
++    "linkedom": "^0.18.13"
+   },
+-  "devDependencies": {},
+   "engines": {
+     "node": ">=20"
+   }
+diff --git a/src/cli.js b/src/cli.js
+index 91668bc..c10e950 100755
+--- a/src/cli.js
++++ b/src/cli.js
+@@ -237,8 +237,11 @@ async function main() {
+       const count = parseInt(args.find(a => a.match(/^\d+$/)) || '20', 10);
+       const specificIds = args.filter(a => a.match(/^\d{10,}$/));
+       const force = args.includes('--force') || args.includes('-f');
+-      const includeMedia = args.includes('--media') || args.includes('-m');
++      // undefined (not false) when the flag is absent, so config.includeMedia applies
++      const includeMedia = (args.includes('--media') || args.includes('-m')) || undefined;
+       const fetchAll = args.includes('--all') || args.includes('-a') || args.includes('-all');
++      const limitIdx = args.indexOf('--limit');
++      const limit = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : undefined;
+ 
+       // Parse --source flag
+       const sourceIdx = args.findIndex(a => a === '--source' || a === '-s');
+@@ -264,6 +267,7 @@ async function main() {
+         force,
+         source,
+         includeMedia,
++        limit,
+         all: fetchAll,
+         maxPages
+       });
+diff --git a/src/processor.js b/src/processor.js
+index 2c1bfbc..c93241f 100644
+--- a/src/processor.js
++++ b/src/processor.js
+@@ -17,6 +17,8 @@ import os from 'os';
+ import dayjs from 'dayjs';
+ import utc from 'dayjs/plugin/utc.js';
+ import timezone from 'dayjs/plugin/timezone.js';
++import { Readability } from '@mozilla/readability';
++import { parseHTML } from 'linkedom';
+ import { loadConfig } from './config.js';
+ 
+ dayjs.extend(utc);
+@@ -264,6 +266,46 @@ function buildBirdEnv(config) {
+   return env;
+ }
+ 
++const rawBio = t => t?._raw?.core?.user_results?.result?.legacy?.description || null;
++
++// --json-full adds the whole API response; keep the author's bio and drop the rest
++function slimRaw(tweet) {
++  const { _raw, ...rest } = tweet;
++  return { ...rest, authorBio: rawBio(tweet) };
++}
++
++const bioCache = new Map();
++
++/**
++ * Profile bios for accounts mentioned in a post, so the classifier knows who
++ * they are ("@dexhorthy" -> "building @humanlayer_dev ... ai that works").
++ * One bird call per new handle per run.
++ */
++export function fetchMentionBios(config, text, author, max = 4) {
++  const handles = [...new Set((text.match(/(?<![\w@])@(\w{1,15})/g) || []).map(h => h.slice(1)))]
++    .filter(h => h.toLowerCase() !== String(author).toLowerCase())
++    .slice(0, max);
++  const env = buildBirdEnv(config);
++  const birdCmd = config.birdPath || 'bird';
++  const out = [];
++  for (const h of handles) {
++    if (!bioCache.has(h)) {
++      try {
++        const raw = execSync(`${birdCmd} user-tweets ${h} -n 1 --json-full`, {
++          encoding: 'utf8', timeout: 30000, maxBuffer: 20 * 1024 * 1024, env, stdio: ['ignore', 'pipe', 'ignore']
++        });
++        const parsed = JSON.parse(raw);
++        const first = (Array.isArray(parsed) ? parsed : (parsed.tweets || []))[0];
++        bioCache.set(h, rawBio(first));
++      } catch {
++        bioCache.set(h, null);
++      }
++    }
++    if (bioCache.get(h)) out.push({ handle: h, bio: bioCache.get(h) });
++  }
++  return out;
++}
++
+ export function fetchBookmarks(config, count = 10, options = {}) {
+   try {
+     const env = buildBirdEnv(config);
+@@ -280,15 +322,15 @@ export function fetchBookmarks(config, count = 10, options = {}) {
+       const estimatedPagesNeeded = Math.ceil(count / 20);
+       const maxPages = options.maxPages || Math.max(estimatedPagesNeeded, 10);
+       cmd = folderId
+-        ? `${birdCmd} bookmarks --folder-id ${folderId} --all --max-pages ${maxPages} --json`
+-        : `${birdCmd} bookmarks --all --max-pages ${maxPages} --json`;
++        ? `${birdCmd} bookmarks --folder-id ${folderId} --all --max-pages ${maxPages} --json-full`
++        : `${birdCmd} bookmarks --all --max-pages ${maxPages} --json-full`;
+     } else {
+       cmd = folderId
+-        ? `${birdCmd} bookmarks --folder-id ${folderId} -n ${count} --json`
+-        : `${birdCmd} bookmarks -n ${count} --json`;
++        ? `${birdCmd} bookmarks --folder-id ${folderId} -n ${count} --json-full`
++        : `${birdCmd} bookmarks -n ${count} --json-full`;
+     }
+ 
+-    console.log(`  Running: ${cmd.replace(/--json/, '').trim()}`);
++    console.log(`  Running: ${cmd.replace(/--json(-full)?/, '').trim()}`);
+ 
+     // Use temp file to work around bird CLI pipe buffering bug
+     const tmpFile = path.join(os.tmpdir(), `smaug-bookmarks-${Date.now()}.json`);
+@@ -302,7 +344,7 @@ export function fetchBookmarks(config, count = 10, options = {}) {
+     const parsed = JSON.parse(output);
+     // bird CLI v0.6.0+ returns { tweets: [...], nextCursor: ... } for paginated requests
+     // but plain arrays for non-paginated. Handle both formats.
+-    let bookmarks = Array.isArray(parsed) ? parsed : (parsed.tweets || []);
++    let bookmarks = (Array.isArray(parsed) ? parsed : (parsed.tweets || [])).map(slimRaw);
+ 
+     // Respect the count parameter - truncate if we fetched more than requested
+     // (paginated mode may return more bookmarks than asked for)
+@@ -407,6 +449,56 @@ export function fetchFromFolders(config, count = 10, options = {}) {
+   return allBookmarks;
+ }
+ 
++// Thread markers like "(1/2)", "1/", "🧵", "thread 👇" suggest the author continued below
++const THREAD_MARKER = /(\b\d{1,2}\s?\/\s?\d{0,2}\)?(\s|$))|🧵|\bthread\b|👇/i;
++
++/**
++ * Fetch the author's own continuation of a thread (self-replies only, no other repliers).
++ * Returns tweets in thread order, including the bookmarked one, or null if not a thread.
++ */
++export function fetchSelfThread(config, bookmark) {
++  const text = bookmark.text || bookmark.full_text || '';
++  const midThread = bookmark.conversationId && String(bookmark.conversationId) !== String(bookmark.id);
++  if (!midThread && !THREAD_MARKER.test(text)) return null;
++
++  try {
++    const env = buildBirdEnv(config);
++    const birdCmd = config.birdPath || 'bird';
++    const output = execSync(`${birdCmd} thread ${bookmark.id} --json`, {
++      encoding: 'utf8',
++      timeout: 30000,
++      maxBuffer: 20 * 1024 * 1024,
++      env
++    });
++    const parsed = JSON.parse(output);
++    const tweets = Array.isArray(parsed) ? parsed : (parsed.tweets || []);
++    const author = bookmark.author?.username;
++
++    // Walk the same-author reply chain from the conversation root
++    const byId = new Map(tweets.map(t => [String(t.id), t]));
++    const chain = new Set();
++    const rootId = String(bookmark.conversationId || bookmark.id);
++    if (byId.get(rootId)?.author?.username === author) chain.add(rootId);
++    else chain.add(String(bookmark.id)); // author's chain hangs off someone else's tweet
++    let grew = true;
++    while (grew) {
++      grew = false;
++      for (const t of tweets) {
++        const id = String(t.id);
++        if (!chain.has(id) && t.author?.username === author && chain.has(String(t.inReplyToStatusId))) {
++          chain.add(id);
++          grew = true;
++        }
++      }
++    }
++    const ordered = [...chain].map(id => byId.get(id)).filter(Boolean).sort((a, b) => (BigInt(a.id) < BigInt(b.id) ? -1 : 1));
++    return ordered.length > 1 ? ordered : null;
++  } catch (error) {
++    console.log(`  Could not fetch thread for ${bookmark.id}: ${error.message}`);
++    return null;
++  }
++}
++
+ export function fetchTweet(config, tweetId) {
+   try {
+     const env = buildBirdEnv(config);
+@@ -510,37 +602,54 @@ export async function fetchGitHubContent(url) {
+   }
+ }
+ 
+-export async function fetchArticleContent(url) {
++function metaContent(document, ...keys) {
++  for (const key of keys) {
++    const el = document.querySelector(`meta[property="${key}"], meta[name="${key}"]`);
++    const v = el?.getAttribute('content')?.trim();
++    if (v) return v;
++  }
++  return null;
++}
++
++/**
++ * HTML -> readable article (Firefox Reader View's algorithm), plus the page's
++ * public title and summary, which survive even when the body is paywalled.
++ */
++export function extractReadable(html) {
++  const { document } = parseHTML(html);
++  const title = metaContent(document, 'og:title', 'twitter:title') || document.querySelector('title')?.textContent?.trim() || null;
++  const description = metaContent(document, 'og:description', 'twitter:description', 'description');
++  let text = null, byline = null;
+   try {
+-    const controller = new AbortController();
+-    const timeout = setTimeout(() => controller.abort(), 30000);
++    const article = new Readability(document).parse();
++    text = article?.textContent?.replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n\n').trim() || null;
++    byline = article?.byline || null;
++  } catch {}
++  return { title, description, byline, text };
++}
+ 
++async function fetchHtml(url) {
++  const controller = new AbortController();
++  const timeout = setTimeout(() => controller.abort(), 30000);
++  try {
+     const response = await fetch(url, {
+-      headers: {
+-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
+-      },
++      headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
+       signal: controller.signal,
+       redirect: 'follow'
+     });
++    return (await response.text()).slice(0, 2_000_000);
++  } finally {
+     clearTimeout(timeout);
+-
+-    const text = await response.text();
+-    // Limit to 50KB like the old curl | head -c 50000
+-    const result = text.slice(0, 50000);
+-
+-    // Check for paywall indicators
+-    if (result.includes('Subscribe') && result.includes('sign in') ||
+-        result.includes('This article is for subscribers') ||
+-        result.length < 1000) {
+-      return { text: result, source: 'direct', paywalled: true };
+-    }
+-
+-    return { text: result, source: 'direct', paywalled: false };
+-  } catch (error) {
+-    throw error;
+   }
+ }
+ 
++export async function fetchArticleContent(url) {
++  const page = extractReadable(await fetchHtml(url));
++  const words = page.text ? page.text.split(/\s+/).length : 0;
++  // Little readable text usually means a paywall or a JS-only page
++  return { ...page, source: 'direct', paywalled: words < 150 };
++}
++
+ export async function fetchContent(url, type, config) {
+   // Use GitHub API for GitHub URLs
+   if (type === 'github') {
+@@ -555,11 +664,12 @@ export async function fetchContent(url, type, config) {
+   // For paywalled sites, note for manual handling or custom bypass
+   if (isPaywalled(url)) {
+     console.log(`  Paywalled domain detected: ${url}`);
+-    return {
+-      url,
+-      source: 'paywalled',
+-      note: 'Content requires paywall bypass - see README for options'
+-    };
++    try {
++      const { title, description, byline } = extractReadable(await fetchHtml(url));
++      return { url, title, description, byline, source: 'paywalled', paywalled: true };
++    } catch {
++      return { url, source: 'paywalled', paywalled: true };
++    }
+   }
+ 
+   // Try direct fetch for other URLs
+@@ -635,6 +745,12 @@ export async function fetchAndPrepareBookmarks(options = {}) {
+     });
+   }
+ 
++  // Cap after deduping, so each run takes the newest N not yet processed (backlog in batches)
++  if (options.limit && toProcess.length > options.limit) {
++    console.log(`Limiting to ${options.limit} of ${toProcess.length} unprocessed tweets`);
++    toProcess = toProcess.slice(0, options.limit);
++  }
++
+   if (toProcess.length === 0) {
+     console.log('No new tweets to process');
+     return { bookmarks: [], count: 0 };
+@@ -659,7 +775,12 @@ export async function fetchAndPrepareBookmarks(options = {}) {
+       }
+       const author = bookmark.author?.username || bookmark.user?.screen_name || 'unknown';
+ 
+-      const tcoLinks = text.match(/https?:\/\/t\.co\/\w+/g) || [];
++      // Self-threads: the payload (and often the link) is in the later tweets
++      const thread = fetchSelfThread(config, bookmark);
++      const threadText = thread ? thread.map(t => t.text || '').join('\n\n') : null;
++      if (thread) console.log(`  Self-thread: ${thread.length} tweets`);
++
++      const tcoLinks = (threadText || text).match(/https?:\/\/t\.co\/\w+/g) || [];
+       
+       // Bookmarks API returns truncated quotedTweet data, so check it for links too
+       if (bookmark.quotedTweet?.text) {
+@@ -762,7 +883,10 @@ export async function fetchAndPrepareBookmarks(options = {}) {
+               console.log(`  GitHub repo: ${fetchResult.fullName} (${fetchResult.stars} stars)`);
+             } else {
+               content = {
+-                text: fetchResult.text?.slice(0, 10000),
++                title: fetchResult.title,
++                description: fetchResult.description,
++                byline: fetchResult.byline,
++                text: fetchResult.text?.slice(0, 40000),
+                 source: fetchResult.source,
+                 paywalled: fetchResult.paywalled
+               };
+@@ -816,6 +940,17 @@ export async function fetchAndPrepareBookmarks(options = {}) {
+       await processDirectArticle(bookmark.article, bookmark.id, 'on tweet');
+       await processDirectArticle(bookmark.quotedTweet?.article, bookmark.quotedTweet?.id, 'on quoted tweet');
+ 
++      // The bookmarks API truncates quoted tweets; read the quoted tweet in full and
++      // check what *it* quotes, where the article often lives (2 links deep)
++      let nestedQuote = null;
++      if (bookmark.quotedTweet?.id && !links.some(l => l.type === 'x-article')) {
++        const q = fetchTweet(config, bookmark.quotedTweet.id);
++        if (q?.quotedTweet) {
++          nestedQuote = { author: q.quotedTweet.author?.username || 'unknown', text: q.quotedTweet.text || '' };
++          await processDirectArticle(q.quotedTweet.article, q.quotedTweet.id, 'two quotes deep');
++        }
++      }
++
+       let replyContext = null;
+       if (bookmark.inReplyToStatusId) {
+         console.log(`  This is a reply to ${bookmark.inReplyToStatusId}, fetching parent...`);
+@@ -849,6 +984,8 @@ export async function fetchAndPrepareBookmarks(options = {}) {
+       // Only included if includeMedia is true (--media flag)
+       const media = configWithOptions.includeMedia ? (bookmark.media || []) : [];
+ 
++      const mentions = fetchMentionBios(config, threadText || text, author);
++
+       // Build tags array from folder tag (if present)
+       const tags = [];
+       if (bookmark._folderTag) {
+@@ -859,7 +996,11 @@ export async function fetchAndPrepareBookmarks(options = {}) {
+         id: bookmark.id,
+         author,
+         authorName: bookmark.author?.name || bookmark.user?.name || author,
++        authorBio: bookmark.authorBio || null,
++        mentions,
++        nestedQuote,
+         text,
++        threadText,
+         tweetUrl: `https://x.com/${author}/status/${bookmark.id}`,
+         createdAt: bookmark.createdAt,
+         links,

@@ -1,0 +1,20 @@
+[project]
+name = "jev-router"
+version = "0.1.0"
+description = "Sort X bookmarks into your topics with Jev and write them up as Obsidian notes"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "anthropic>=1.11.0",
+    "pyyaml>=6.0.3",
+    "typesafe-sdk>=0.7.2",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.17,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
