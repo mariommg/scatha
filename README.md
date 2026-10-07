@@ -1,4 +1,4 @@
-# smaug-jev
+# scatha
 
 *Your X bookmarks, sorted into topics you choose and written up as notes in Obsidian (or any folder), on a schedule.*
 
@@ -56,7 +56,7 @@ Batch size is yours to set. A big backlog clears a batch per run.
 
 ## Where your stuff goes
 
-Your settings, your topics, and the ledger live in one data folder (`~/.smaug-jev`). Your secrets are stored where only you can read them: Windows user environment variables, or a file only your account can open on macOS and Linux. They never go in a config file, the answers file, or a log.
+Your settings, your topics, and the ledger live in one data folder (`~/.scatha`). Your secrets are stored where only you can read them: Windows user environment variables, or a file only your account can open on macOS and Linux. They never go in a config file, the answers file, or a log.
 
 What leaves your computer: your X session talks to X (it's your login, used the way your browser uses it). Bookmark text goes to TypeSafe for sorting and to Anthropic for writing notes. That's it.
 
@@ -74,4 +74,8 @@ What leaves your computer: your X session talks to X (it's your login, used the 
 
 ## Credits
 
-Built on [Smaug](https://github.com/alexknowshtml/smaug) by Alex Hillman (MIT; vendored here with changes, listed in `smaug/CHANGES-smaug-jev.md`), [bird](https://www.npmjs.com/package/@steipete/bird) by Peter Steinberger (MIT; its X client is vendored in `smaug/vendor/bird/`), [Jev](https://typesafe.ai) by TypeSafe, Mozilla's [Readability](https://github.com/mozilla/readability), and Claude.
+Built on [Smaug](https://github.com/alexknowshtml/smaug) by Alex Hillman (MIT; vendored here with changes, listed in `smaug/CHANGES-scatha.md`), [bird](https://www.npmjs.com/package/@steipete/bird) by Peter Steinberger (MIT; its X client is vendored in `smaug/vendor/bird/`), [Jev](https://typesafe.ai) by TypeSafe, Mozilla's [Readability](https://github.com/mozilla/readability), and Claude.
+
+## License
+
+MIT, see [LICENSE](LICENSE). The vendored Smaug and bird code keep their own MIT licenses (`smaug/LICENSE`, `smaug/vendor/bird/LICENSE`).

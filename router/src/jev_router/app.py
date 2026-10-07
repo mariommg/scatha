@@ -2,7 +2,7 @@
 
 Everything user-specific lives in one data folder, outside the code:
 
-    ~/.smaug-jev/            (override with SMAUGJEV_HOME)
+    ~/.scatha/               (override with SCATHA_HOME)
       config.json            batch size, note writer, schedule, tool paths
       topics.yaml            the buckets: what belongs where, and which folder
       secrets.env            macOS/Linux only (mode 600); Windows uses user environment variables
@@ -19,10 +19,10 @@ import stat
 import sys
 from pathlib import Path
 
-APP_NAME = "smaug-jev"
-HOME_DIRNAME = ".smaug-jev"
-HOME_ENV = "SMAUGJEV_HOME"
-TASK_NAME = "SmaugJev-Ingest"  # Windows Task Scheduler / launchd / systemd unit stem
+APP_NAME = "scatha"
+HOME_DIRNAME = ".scatha"
+HOME_ENV = "SCATHA_HOME"
+TASK_NAME = "Scatha-Ingest"  # Windows Task Scheduler / launchd / systemd unit stem
 REPO = Path(__file__).resolve().parents[3]  # the checkout: router/, smaug/, docs/
 
 # Secrets, by the variable name the tools read. X cookies are stored under bird's

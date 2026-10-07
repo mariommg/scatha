@@ -4,7 +4,7 @@ Vendored from https://github.com/alexknowshtml/smaug at commit
 `f3309008f93323db6a7e745262fcdb6927a2efd0` (2026-02-02), MIT license (see `LICENSE`).
 The full diff against that commit is in `../smaug-upstream-changes.patch`.
 
-smaug-jev uses Smaug for fetching and preparing bookmarks only. Its Claude Code
+scatha uses Smaug for fetching and preparing bookmarks only. Its Claude Code
 processing step (`.claude/commands/process-bookmarks.md`, `bookmarks.md`) is not
 used; the router in `../router` sorts and writes notes instead.
 

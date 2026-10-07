@@ -93,7 +93,7 @@ td:first-child { width: 42%; }
 <body>
 <div class="wrap">
   <header style="display:grid;gap:10px">
-    <span class="eyebrow">smaug-jev · setup planner</span>
+    <span class="eyebrow">scatha · setup planner</span>
     <h1>Bookmark Setup Planner</h1>
     <p class="prose">You save things on X because they matter to you, and then (if you're like me) you never see them again. This sets up a small machine that pulls your bookmarks on a schedule, sorts each one into topics you choose, and writes it up as a note in your Obsidian vault or any folder you like.</p>
     <p class="prose">Plan the setup here, download one file, and the setup wizard takes it from there.</p>
@@ -332,7 +332,7 @@ td:first-child { width: 42%; }
   // ---- output ----
   function answers() {
     return {
-      _about: "Answers for the smaug-jev setup wizard. No secrets in here, on purpose.",
+      _about: "Answers for the scatha setup wizard. No secrets in here, on purpose.",
       topics: state.topics.filter(t => t.label.trim()).map(t => ({
         label: t.label.trim(), description: (t.description || "").trim(), preset: !!t.preset, destination: destOf(t) })),
       draft_definitions: true,
