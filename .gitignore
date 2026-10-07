@@ -16,3 +16,6 @@ router/.venv/
 __pycache__/
 *.pyc
 .pytest_cache/
+
+# Session handoff (personal paths and history)
+HANDOFF.md
