@@ -7,6 +7,7 @@ Everything user-specific lives in one data folder, outside the code:
       topics.yaml            the buckets: what belongs where, and which folder
       secrets.env            macOS/Linux only (mode 600); Windows uses user environment variables
       work/                  ledger, pending batch, per-run outputs, logs
+    (optional) backup_dir    a dated zip of the above after each run, secrets excluded
 
 The project name appears here and nowhere else in the code, so a rename is one edit.
 """
@@ -44,6 +45,9 @@ DEFAULT_CONFIG = {
     "reader_profile": "",  # a sentence about you; Haiku tailors how-to steps to it
     "schedule": {"cadence": "weekly", "day": "Saturday", "time": "00:01"},
     "tools": {"node": "node", "bird": "bird", "claude": "claude"},
+    "backup_dir": "",  # a dated zip of this folder goes here after each run (see backup.py)
+    "backup_keep": 8,
+    "backup_extra": [],
 }
 
 

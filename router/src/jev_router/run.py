@@ -22,7 +22,7 @@ import subprocess
 import sys
 import urllib.request
 
-from . import Taxonomy, app, notes
+from . import Taxonomy, app, backup, notes
 from .smaug import route_file
 
 # Minimum days between runs per cadence. Schedulers that can't express "every two
@@ -176,6 +176,13 @@ def main(argv: list[str] | None = None) -> int:
         return 1 if failed else 0
     finally:
         lock.unlink(missing_ok=True)
+        if not args.preview:
+            try:
+                zipped = backup.snapshot(cfg)
+                if zipped:
+                    log(f"backed up the data folder to {zipped}")
+            except Exception as e:  # a backup problem must not turn a good run into a failed one
+                log(f"WARNING: backup failed: {type(e).__name__}: {e}")
 
 
 if __name__ == "__main__":
