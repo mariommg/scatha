@@ -79,8 +79,6 @@ The log lands in `~/.scatha/work/logs/` either way.
 
 On Windows the secrets are user environment variables: `TWITTER_AUTH_TOKEN`, `TWITTER_CT0`, `TYPESAFE_API_KEY`, and `ANTHROPIC_API_KEY` if you use the API.
 
-**Backups.** The ledger and your topics live only in this folder. To keep a copy somewhere safer, set `backup_dir` in `config.json` to a folder that syncs off this machine (Nextcloud, OneDrive, Dropbox, a NAS). After every run a dated zip of the data folder lands there; `backup_keep` (default 8) says how many to keep, and `backup_extra` lists other files to copy alongside. `secrets.env` and preview notes are never included. Back up on demand with `uv run --project router python -m jev_router.backup`; `setup status` shows the newest one. To restore, unzip into a fresh `~/.scatha` and run `setup schedule`.
-
 Each note's front matter carries `source`, `tweet_id`, `author`, `posted`, `captured`, `bucket`, `bucket_score`, `tags`, and `words`, so Obsidian's Properties and Bases can sort and filter them.
 
 ## 5. Tuning your topics

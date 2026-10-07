@@ -56,7 +56,7 @@ Batch size is yours to set. A big backlog clears a batch per run.
 
 ## Where your stuff goes
 
-Your settings, your topics, and the ledger live in one data folder (`~/.scatha`). Your secrets are stored where only you can read them: Windows user environment variables, or a file only your account can open on macOS and Linux. They never go in a config file, the answers file, a log, or a backup. Point `backup_dir` at a synced folder and each run leaves a dated zip of the data folder there ([RUNBOOK](docs/RUNBOOK.md) section 4).
+Your settings, your topics, and the ledger live in one data folder (`~/.scatha`). Your secrets are stored where only you can read them: Windows user environment variables, or a file only your account can open on macOS and Linux. They never go in a config file, the answers file, or a log.
 
 What leaves your computer: your X session talks to X (it's your login, used the way your browser uses it). Bookmark text goes to TypeSafe for sorting and to Anthropic for writing notes. That's it.
 

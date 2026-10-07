@@ -372,11 +372,6 @@ def status() -> None:
         say(f"  {name:<13} {'✓ saved' if os.environ.get(var) or (name.startswith('x_') and os.environ.get(var.replace('TWITTER_', ''))) else '✗ missing'}")
     say(f"  note writer   {cfg['notes_backend']}")
     say(f"  schedule      {scheduler.describe(cfg['schedule'])}, {cfg['batch_size']} per run")
-    if cfg.get("backup_dir"):
-        zips = sorted(Path(cfg["backup_dir"]).expanduser().glob(f"{app.APP_NAME}-data_*.zip"))
-        say(f"  backup        {cfg['backup_dir']} ({len(zips)} kept" + (f", newest {zips[-1].name})" if zips else ")"))
-    else:
-        say("  backup        off (set backup_dir in config.json)")
     ledger = app.work() / "ingested.md"
     if ledger.exists():
         say(f"  processed     {sum(1 for l in ledger.read_text(encoding='utf-8').splitlines() if 'x.com/' in l)} bookmarks")
