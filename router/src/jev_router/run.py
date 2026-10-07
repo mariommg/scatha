@@ -126,7 +126,7 @@ def main(argv: list[str] | None = None) -> int:
         tax = Taxonomy.load(tax_path)
 
         # 1. X login still good?
-        code, out = sh([cfg["tools"]["bird"], "whoami", "--plain"], app.REPO)
+        code, out = sh([cfg["tools"]["node"], "src/cli.js", "whoami"], app.REPO / "smaug", env=smaug_env(cfg))
         if code != 0 or "user:" not in out:
             ping(cfg, "Bookmark import stopped: your X login has expired. Run the setup's 'x-login' step "
                       "with fresh cookies and it will pick up next run.")

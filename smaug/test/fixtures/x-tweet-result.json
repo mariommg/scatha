@@ -1,0 +1,719 @@
+{
+  "note": "TweetDetail result for a public post (viewer fields removed); see test/x.test.js",
+  "raw": {
+    "__typename": "Tweet",
+    "core": {
+      "user_results": {
+        "result": {
+          "__typename": "User",
+          "affiliates_highlighted_label": {},
+          "avatar": {
+            "image_url": "https://pbs.twimg.com/profile_images/1796518236143382528/1kS1gq1A_normal.jpg"
+          },
+          "core": {
+            "created_at": "Wed Oct 11 11:19:35 +0000 2006",
+            "name": "📙 Alex Hillman",
+            "screen_name": "alexhillman"
+          },
+          "dm_permissions": {},
+          "follow_request_sent": false,
+          "has_graduated_access": true,
+          "id": "VXNlcjo4NDEy",
+          "is_blue_verified": true,
+          "legacy": {
+            "default_profile": false,
+            "default_profile_image": false,
+            "description": "one of the first ~8,000 people on this site, somehow. left. now i'm back and working on @jfdibot to help me run my community, businesses, and more. ai mechanic.",
+            "entities": {
+              "description": {},
+              "url": {
+                "urls": [
+                  {
+                    "display_url": "jfdi.bot",
+                    "expanded_url": "http://jfdi.bot",
+                    "indices": [
+                      0,
+                      23
+                    ],
+                    "url": "https://t.co/234spRfLaM"
+                  }
+                ]
+              }
+            },
+            "fast_followers_count": 0,
+            "favourites_count": 47631,
+            "follow_request_sent": false,
+            "followers_count": 15469,
+            "friends_count": 721,
+            "has_custom_timelines": true,
+            "is_translator": false,
+            "listed_count": 834,
+            "media_count": 452,
+            "needs_phone_verification": false,
+            "normal_followers_count": 15469,
+            "pinned_tweet_ids_str": [
+              "2033677827493478544"
+            ],
+            "possibly_sensitive": false,
+            "profile_banner_url": "https://pbs.twimg.com/profile_banners/8412/1767413631",
+            "profile_interstitial_type": "",
+            "statuses_count": 3717,
+            "time_zone": "",
+            "translator_type": "none",
+            "url": "https://t.co/234spRfLaM",
+            "utc_offset": 0,
+            "withheld_description": "",
+            "withheld_scope": ""
+          },
+          "location": {
+            "location": "Philadelphia"
+          },
+          "media_permissions": {},
+          "parody_commentary_fan_label": "None",
+          "privacy": {
+            "protected": false
+          },
+          "professional": {
+            "category": [
+              {
+                "icon_name": "IconBriefcaseStroke",
+                "id": 1009,
+                "name": "Community"
+              }
+            ],
+            "professional_type": "Creator",
+            "rest_id": "1456802995786686465"
+          },
+          "profile_bio": {
+            "description": "one of the first ~8,000 people on this site, somehow. left. now i'm back and working on @jfdibot to help me run my community, businesses, and more. ai mechanic."
+          },
+          "profile_description_language": "en",
+          "profile_image_shape": "Circle",
+          "relationship_perspectives": {
+            "blocked_by": false
+          },
+          "rest_id": "8412",
+          "super_follow_eligible": false,
+          "tipjar_settings": {
+            "is_enabled": false
+          },
+          "verification": {
+            "verified": false
+          }
+        }
+      }
+    },
+    "edit_control": {
+      "edit_tweet_ids": [
+        "2106574379802824800"
+      ],
+      "editable_until_msecs": "1791085045000",
+      "edits_remaining": "5",
+      "is_edit_eligible": true
+    },
+    "grok_analysis_button": true,
+    "has_birdwatch_notes": false,
+    "is_translatable": false,
+    "legacy": {
+      "bookmark_count": 39,
+      "conversation_id_str": "2106574379802824800",
+      "created_at": "Sun Oct 04 02:37:25 +0000 2026",
+      "display_text_range": [
+        0,
+        196
+      ],
+      "entities": {
+        "media": [
+          {
+            "additional_media_info": {
+              "monetizable": false
+            },
+            "allow_download_status": {
+              "allow_download": true
+            },
+            "display_url": "pic.x.com/yIWY2SDMb8",
+            "expanded_url": "https://x.com/alexhillman/status/2106574379802824800/video/1",
+            "ext_media_availability": {
+              "status": "Available"
+            },
+            "id_str": "2106574359665987584",
+            "indices": [
+              197,
+              220
+            ],
+            "media_key": "13_2106574359665987584",
+            "media_results": {
+              "result": {
+                "media_key": "13_2106574359665987584"
+              }
+            },
+            "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2106574359665987584/img/VryDsMMpmyUJ2GPa.jpg",
+            "original_info": {
+              "focus_rects": [],
+              "height": 1280,
+              "width": 588
+            },
+            "sizes": {
+              "large": {
+                "h": 1280,
+                "resize": "fit",
+                "w": 588
+              },
+              "medium": {
+                "h": 1200,
+                "resize": "fit",
+                "w": 551
+              },
+              "small": {
+                "h": 680,
+                "resize": "fit",
+                "w": 312
+              },
+              "thumb": {
+                "h": 150,
+                "resize": "crop",
+                "w": 150
+              }
+            },
+            "type": "video",
+            "url": "https://t.co/yIWY2SDMb8",
+            "video_info": {
+              "aspect_ratio": [
+                147,
+                320
+              ],
+              "duration_millis": 20400,
+              "variants": [
+                {
+                  "content_type": "application/x-mpegURL",
+                  "url": "https://video.twimg.com/amplify_video/2106574359665987584/pl/0FMMGJchLChvw0yP.m3u8?tag=29&v=cfc"
+                },
+                {
+                  "bitrate": 632000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2106574359665987584/vid/avc1/320x696/S2fcg8eofxoCSUF3.mp4?tag=29"
+                },
+                {
+                  "bitrate": 950000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2106574359665987584/vid/avc1/480x1044/keWoFisXbQRSwExu.mp4?tag=29"
+                },
+                {
+                  "bitrate": 2176000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2106574359665987584/vid/avc1/588x1280/_X6NVx-0Ca_7LHex.mp4?tag=29"
+                }
+              ]
+            }
+          },
+          {
+            "allow_download_status": {
+              "allow_download": true
+            },
+            "display_url": "pic.x.com/yIWY2SDMb8",
+            "expanded_url": "https://x.com/alexhillman/status/2106574379802824800/video/1",
+            "ext_media_availability": {
+              "status": "Available"
+            },
+            "features": {
+              "large": {
+                "faces": []
+              },
+              "medium": {
+                "faces": []
+              },
+              "orig": {
+                "faces": []
+              },
+              "small": {
+                "faces": []
+              }
+            },
+            "id_str": "2106574359645106176",
+            "indices": [
+              197,
+              220
+            ],
+            "media_key": "3_2106574359645106176",
+            "media_results": {
+              "result": {
+                "media_key": "3_2106574359645106176"
+              }
+            },
+            "media_url_https": "https://pbs.twimg.com/media/HTwOOA-XsAAFvBG.jpg",
+            "original_info": {
+              "focus_rects": [
+                {
+                  "h": 820,
+                  "w": 1464,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "h": 820,
+                  "w": 820,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "h": 820,
+                  "w": 719,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "h": 820,
+                  "w": 410,
+                  "x": 49,
+                  "y": 0
+                },
+                {
+                  "h": 820,
+                  "w": 2036,
+                  "x": 0,
+                  "y": 0
+                }
+              ],
+              "height": 820,
+              "width": 2036
+            },
+            "sizes": {
+              "large": {
+                "h": 820,
+                "resize": "fit",
+                "w": 2036
+              },
+              "medium": {
+                "h": 483,
+                "resize": "fit",
+                "w": 1200
+              },
+              "small": {
+                "h": 274,
+                "resize": "fit",
+                "w": 680
+              },
+              "thumb": {
+                "h": 150,
+                "resize": "crop",
+                "w": 150
+              }
+            },
+            "type": "photo",
+            "url": "https://t.co/yIWY2SDMb8"
+          }
+        ],
+        "urls": [
+          {
+            "display_url": "github.com/alexknowshtml/…",
+            "expanded_url": "https://github.com/alexknowshtml/claude-auto-handoff",
+            "indices": [
+              173,
+              196
+            ],
+            "url": "https://t.co/qwJivOgNaq"
+          }
+        ]
+      },
+      "extended_entities": {
+        "media": [
+          {
+            "additional_media_info": {
+              "monetizable": false
+            },
+            "allow_download_status": {
+              "allow_download": true
+            },
+            "display_url": "pic.x.com/yIWY2SDMb8",
+            "expanded_url": "https://x.com/alexhillman/status/2106574379802824800/video/1",
+            "ext_media_availability": {
+              "status": "Available"
+            },
+            "id_str": "2106574359665987584",
+            "indices": [
+              197,
+              220
+            ],
+            "media_key": "13_2106574359665987584",
+            "media_results": {
+              "result": {
+                "media_key": "13_2106574359665987584"
+              }
+            },
+            "media_url_https": "https://pbs.twimg.com/amplify_video_thumb/2106574359665987584/img/VryDsMMpmyUJ2GPa.jpg",
+            "original_info": {
+              "focus_rects": [],
+              "height": 1280,
+              "width": 588
+            },
+            "sizes": {
+              "large": {
+                "h": 1280,
+                "resize": "fit",
+                "w": 588
+              },
+              "medium": {
+                "h": 1200,
+                "resize": "fit",
+                "w": 551
+              },
+              "small": {
+                "h": 680,
+                "resize": "fit",
+                "w": 312
+              },
+              "thumb": {
+                "h": 150,
+                "resize": "crop",
+                "w": 150
+              }
+            },
+            "type": "video",
+            "url": "https://t.co/yIWY2SDMb8",
+            "video_info": {
+              "aspect_ratio": [
+                147,
+                320
+              ],
+              "duration_millis": 20400,
+              "variants": [
+                {
+                  "content_type": "application/x-mpegURL",
+                  "url": "https://video.twimg.com/amplify_video/2106574359665987584/pl/0FMMGJchLChvw0yP.m3u8?tag=29&v=cfc"
+                },
+                {
+                  "bitrate": 632000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2106574359665987584/vid/avc1/320x696/S2fcg8eofxoCSUF3.mp4?tag=29"
+                },
+                {
+                  "bitrate": 950000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2106574359665987584/vid/avc1/480x1044/keWoFisXbQRSwExu.mp4?tag=29"
+                },
+                {
+                  "bitrate": 2176000,
+                  "content_type": "video/mp4",
+                  "url": "https://video.twimg.com/amplify_video/2106574359665987584/vid/avc1/588x1280/_X6NVx-0Ca_7LHex.mp4?tag=29"
+                }
+              ]
+            }
+          },
+          {
+            "allow_download_status": {
+              "allow_download": true
+            },
+            "display_url": "pic.x.com/yIWY2SDMb8",
+            "expanded_url": "https://x.com/alexhillman/status/2106574379802824800/video/1",
+            "ext_media_availability": {
+              "status": "Available"
+            },
+            "features": {
+              "large": {
+                "faces": []
+              },
+              "medium": {
+                "faces": []
+              },
+              "orig": {
+                "faces": []
+              },
+              "small": {
+                "faces": []
+              }
+            },
+            "id_str": "2106574359645106176",
+            "indices": [
+              197,
+              220
+            ],
+            "media_key": "3_2106574359645106176",
+            "media_results": {
+              "result": {
+                "media_key": "3_2106574359645106176"
+              }
+            },
+            "media_url_https": "https://pbs.twimg.com/media/HTwOOA-XsAAFvBG.jpg",
+            "original_info": {
+              "focus_rects": [
+                {
+                  "h": 820,
+                  "w": 1464,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "h": 820,
+                  "w": 820,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "h": 820,
+                  "w": 719,
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "h": 820,
+                  "w": 410,
+                  "x": 49,
+                  "y": 0
+                },
+                {
+                  "h": 820,
+                  "w": 2036,
+                  "x": 0,
+                  "y": 0
+                }
+              ],
+              "height": 820,
+              "width": 2036
+            },
+            "sizes": {
+              "large": {
+                "h": 820,
+                "resize": "fit",
+                "w": 2036
+              },
+              "medium": {
+                "h": 483,
+                "resize": "fit",
+                "w": 1200
+              },
+              "small": {
+                "h": 274,
+                "resize": "fit",
+                "w": 680
+              },
+              "thumb": {
+                "h": 150,
+                "resize": "crop",
+                "w": 150
+              }
+            },
+            "type": "photo",
+            "url": "https://t.co/yIWY2SDMb8"
+          }
+        ]
+      },
+      "favorite_count": 28,
+      "full_text": "Gave auto-handoff a BUNCH of upgrades, including UI improvements and a web UI for reviewing an entire chain of sessions by their handoffs. \n\nEntirely local and open source: https://t.co/qwJivOgNaq https://t.co/yIWY2SDMb8",
+      "id_str": "2106574379802824800",
+      "is_quote_status": true,
+      "lang": "en",
+      "possibly_sensitive": false,
+      "possibly_sensitive_editable": true,
+      "quote_count": 0,
+      "quoted_status_id_str": "2106464115447463942",
+      "quoted_status_permalink": {
+        "display": "x.com/alexhillman/st…",
+        "expanded": "https://twitter.com/alexhillman/status/2106464115447463942",
+        "url": "https://t.co/m5ZfOZHlvM"
+      },
+      "reply_count": 0,
+      "retweet_count": 1,
+      "user_id_str": "8412"
+    },
+    "quick_promote_eligibility": {
+      "eligibility": "IneligibleNotVerified"
+    },
+    "quoted_status_result": {
+      "result": {
+        "__typename": "Tweet",
+        "card": {
+          "rest_id": "https://t.co/lhcP2b3B2O"
+        },
+        "core": {
+          "user_results": {
+            "result": {
+              "__typename": "User",
+              "affiliates_highlighted_label": {},
+              "avatar": {
+                "image_url": "https://pbs.twimg.com/profile_images/1796518236143382528/1kS1gq1A_normal.jpg"
+              },
+              "core": {
+                "created_at": "Wed Oct 11 11:19:35 +0000 2006",
+                "name": "📙 Alex Hillman",
+                "screen_name": "alexhillman"
+              },
+              "dm_permissions": {},
+              "follow_request_sent": false,
+              "has_graduated_access": true,
+              "id": "VXNlcjo4NDEy",
+              "is_blue_verified": true,
+              "legacy": {
+                "default_profile": false,
+                "default_profile_image": false,
+                "description": "one of the first ~8,000 people on this site, somehow. left. now i'm back and working on @jfdibot to help me run my community, businesses, and more. ai mechanic.",
+                "entities": {
+                  "description": {},
+                  "url": {
+                    "urls": [
+                      {
+                        "display_url": "jfdi.bot",
+                        "expanded_url": "http://jfdi.bot",
+                        "indices": [
+                          0,
+                          23
+                        ],
+                        "url": "https://t.co/234spRfLaM"
+                      }
+                    ]
+                  }
+                },
+                "fast_followers_count": 0,
+                "favourites_count": 47631,
+                "follow_request_sent": false,
+                "followers_count": 15469,
+                "friends_count": 721,
+                "has_custom_timelines": true,
+                "is_translator": false,
+                "listed_count": 834,
+                "media_count": 452,
+                "needs_phone_verification": false,
+                "normal_followers_count": 15469,
+                "pinned_tweet_ids_str": [
+                  "2033677827493478544"
+                ],
+                "possibly_sensitive": false,
+                "profile_banner_url": "https://pbs.twimg.com/profile_banners/8412/1767413631",
+                "profile_interstitial_type": "",
+                "statuses_count": 3717,
+                "time_zone": "",
+                "translator_type": "none",
+                "url": "https://t.co/234spRfLaM",
+                "utc_offset": 0,
+                "withheld_description": "",
+                "withheld_scope": ""
+              },
+              "location": {
+                "location": "Philadelphia"
+              },
+              "media_permissions": {},
+              "parody_commentary_fan_label": "None",
+              "privacy": {
+                "protected": false
+              },
+              "professional": {
+                "category": [
+                  {
+                    "icon_name": "IconBriefcaseStroke",
+                    "id": 1009,
+                    "name": "Community"
+                  }
+                ],
+                "professional_type": "Creator",
+                "rest_id": "1456802995786686465"
+              },
+              "profile_bio": {
+                "description": "one of the first ~8,000 people on this site, somehow. left. now i'm back and working on @jfdibot to help me run my community, businesses, and more. ai mechanic."
+              },
+              "profile_description_language": "en",
+              "profile_image_shape": "Circle",
+              "relationship_perspectives": {
+                "blocked_by": false
+              },
+              "rest_id": "8412",
+              "super_follow_eligible": false,
+              "tipjar_settings": {
+                "is_enabled": false
+              },
+              "verification": {
+                "verified": false
+              }
+            }
+          }
+        },
+        "edit_control": {
+          "edit_tweet_ids": [
+            "2106464115447463942"
+          ],
+          "editable_until_msecs": "1791058755000",
+          "edits_remaining": "5",
+          "is_edit_eligible": true
+        },
+        "grok_analysis_button": true,
+        "has_birdwatch_notes": false,
+        "is_translatable": false,
+        "legacy": {
+          "bookmark_count": 165,
+          "conversation_id_str": "2106464115447463942",
+          "created_at": "Sat Oct 03 19:19:15 +0000 2026",
+          "display_text_range": [
+            0,
+            226
+          ],
+          "entities": {
+            "urls": [
+              {
+                "display_url": "github.com/alexknowshtml/…",
+                "expanded_url": "https://github.com/alexknowshtml/claude-auto-handoff/tree/main",
+                "indices": [
+                  118,
+                  141
+                ],
+                "url": "https://t.co/lhcP2b3B2O"
+              }
+            ]
+          },
+          "favorite_count": 83,
+          "full_text": "Since my Claude auto-hand workflow is getting a lot of questions, I turned it into a Claude mod. \n\nMeet auto-handoff: https://t.co/lhcP2b3B2O\n\nThis def needs more battle testing, and is built to be personalized. \n\nPRs welcome!",
+          "id_str": "2106464115447463942",
+          "is_quote_status": false,
+          "lang": "en",
+          "possibly_sensitive": false,
+          "possibly_sensitive_editable": true,
+          "quote_count": 2,
+          "reply_count": 4,
+          "retweet_count": 1,
+          "user_id_str": "8412"
+        },
+        "rest_id": "2106464115447463942",
+        "unmention_data": {},
+        "views": {
+          "count": "12262",
+          "state": "EnabledWithCount"
+        }
+      }
+    },
+    "rest_id": "2106574379802824800",
+    "unmention_data": {},
+    "views": {
+      "count": "2090",
+      "state": "EnabledWithCount"
+    }
+  },
+  "expected": {
+    "id": "2106574379802824800",
+    "text": "Gave auto-handoff a BUNCH of upgrades, including UI improvements and a web UI for reviewing an entire chain of sessions by their handoffs. \n\nEntirely local and open source: https://t.co/qwJivOgNaq https://t.co/yIWY2SDMb8",
+    "createdAt": "Sun Oct 04 02:37:25 +0000 2026",
+    "replyCount": 0,
+    "retweetCount": 1,
+    "likeCount": 28,
+    "conversationId": "2106574379802824800",
+    "author": {
+      "username": "alexhillman",
+      "name": "📙 Alex Hillman"
+    },
+    "authorId": "8412",
+    "media": [
+      {
+        "type": "video",
+        "url": "https://pbs.twimg.com/amplify_video_thumb/2106574359665987584/img/VryDsMMpmyUJ2GPa.jpg",
+        "width": 588,
+        "height": 1280,
+        "previewUrl": "https://pbs.twimg.com/amplify_video_thumb/2106574359665987584/img/VryDsMMpmyUJ2GPa.jpg:small",
+        "videoUrl": "https://video.twimg.com/amplify_video/2106574359665987584/vid/avc1/588x1280/_X6NVx-0Ca_7LHex.mp4?tag=29",
+        "durationMs": 20400
+      },
+      {
+        "type": "photo",
+        "url": "https://pbs.twimg.com/media/HTwOOA-XsAAFvBG.jpg",
+        "width": 2036,
+        "height": 820,
+        "previewUrl": "https://pbs.twimg.com/media/HTwOOA-XsAAFvBG.jpg:small"
+      }
+    ]
+  }
+}

@@ -86,10 +86,12 @@ def node_major(node: str) -> int:
         return 0
 
 
-def verify_x(bird: str) -> str | None:
-    """Returns the @handle bird sees, or None."""
+def verify_x(cfg: dict) -> str | None:
+    """Returns the @handle X sees, or None."""
+    from .run import smaug_env
     app.load_secrets()
-    p = subprocess.run([bird, "whoami", "--plain"], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    p = subprocess.run([cfg["tools"]["node"], "src/cli.js", "whoami"], cwd=app.REPO / "smaug", env=smaug_env(cfg),
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
     m = re.search(r"user:\s*(@\S+)", p.stdout)
     return m.group(1) if m else None
 
@@ -122,7 +124,7 @@ def step_prereqs(cfg: dict) -> bool:
     ok = True
     node = which("node")
     if not node or node_major(node) < 22:
-        say("  ✗ Node.js 22 or newer is needed (it runs Smaug and bird). Get it at https://nodejs.org, then run setup again.")
+        say("  ✗ Node.js 22 or newer is needed (it runs Smaug). Get it at https://nodejs.org, then run setup again.")
         ok = False
     else:
         cfg["tools"]["node"] = node
@@ -133,17 +135,15 @@ def step_prereqs(cfg: dict) -> bool:
         subprocess.run([which("npm") or "npm", "install", "--silent"], cwd=smaug, check=False)
     bird = which("bird")
     if not bird and ok:
-        say("  bird (the X command-line tool Smaug uses) isn't installed.")
-        say("  Heads up: bird 0.8.0 is the last release and it's marked deprecated (its author pulled the repo).")
-        say("  It still works today; if X changes things, it may stop.")
-        if yes("Install bird 0.8.0 with npm now?"):
+        say("  Optional: bird, a command-line X tool, as a backup. Smaug reads X with its own copy of")
+        say("  bird's code; if that ever fails, an installed bird is tried instead. bird 0.8.0 is the")
+        say("  last release (its author stopped maintaining it), so it's a backup, not a fix.")
+        if yes("Install bird 0.8.0 with npm as a backup?", default=False):
             subprocess.run([which("npm") or "npm", "install", "-g", "@steipete/bird@0.8.0"], check=False)
             bird = which("bird")
     if bird:
         cfg["tools"]["bird"] = bird
-        say("  ✓ bird")
-    else:
-        ok = False
+        say("  ✓ bird (backup)")
     return ok
 
 
@@ -154,7 +154,7 @@ def step_x(cfg: dict, verify: bool = True) -> bool:
     say("    3. Copy the values of auth_token and ct0.")
     say("  They're the keys to your X session, so treat them like a password. They stop working")
     say("  when you log out of X; when that happens, run:  onboard x-login")
-    handle = verify_x(cfg["tools"]["bird"]) if verify and app.has_secret("AUTH_TOKEN") else None
+    handle = verify_x(cfg) if verify and app.has_secret("AUTH_TOKEN") else None
     if handle and not yes(f"Saved cookies still work (X sees {handle}). Replace them?", default=False):
         say("  ✓ Keeping the saved cookies.")
         return True
@@ -162,7 +162,7 @@ def step_x(cfg: dict, verify: bool = True) -> bool:
         token = secret("auth_token")
         ct0 = secret("ct0")
         os.environ["AUTH_TOKEN"], os.environ["CT0"] = token, ct0
-        handle = verify_x(cfg["tools"]["bird"]) if verify else "(not checked)"
+        handle = verify_x(cfg) if verify else "(not checked)"
         if handle:
             where = app.save_secret(app.SECRETS["x_auth_token"], token)
             app.save_secret(app.SECRETS["x_ct0"], ct0)

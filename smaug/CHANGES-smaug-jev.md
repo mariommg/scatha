@@ -31,5 +31,13 @@ used; the router in `../router` sorts and writes notes instead.
   (`mentions`), cached per run.
 - **`fetch --limit N`.** Caps the batch *after* deduplication, so each run takes the
   newest N not yet processed.
+- **Own X client, bird as fallback.** bird's client library (0.8.0, MIT) is vendored in
+  `vendor/bird/` and called in-process through `src/x.js`, which returns the same JSON
+  the bird CLI printed. If a call fails and the bird CLI is installed, that call is
+  retried through it (`src/x-bird.js`, the old shell-out code). `SMAUG_X_CLIENT=builtin|bird`
+  forces one path; each fetch ends with a count of built-in calls and fallbacks.
+  `fetchBookmarks`, `fetchTweet`, `fetchSelfThread`, `fetchMentionBios`, `fetchLikes`,
+  `fetchFromSource`, and `fetchFromFolders` are now async. New `whoami` command;
+  `setup` no longer requires bird.
 - **Sample data removed.** The upstream author's own `bookmarks.md` and `knowledge/`
   examples are not included.

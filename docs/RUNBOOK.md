@@ -105,7 +105,7 @@ Start with `setup status`; it shows what's configured and the newest log.
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Summary says your X login expired | You logged out of X, or the session aged out | `setup x-login` with fresh cookies |
-| Fetch fails with errors from bird | X changed something bird depends on | Check for a newer bird; if none, this is the frozen-dependency risk in the README |
+| Log shows `falling back to bird`, or the fetch fails | X changed something the built-in client depends on | If the backup bird carried the run, nothing is lost yet. Either way, the fix goes in `smaug/vendor/bird/` (see its README) |
 | `claude -p failed` in the log | Claude Code logged out, or you hit your usage window | Run `claude` once to log back in; failed notes retry next run |
 | Some notes failed, `content filtering policy` | Claude declined to read a particular post or image | Nothing to do; that post is filed from its text alone or retried |
 | Nothing ran on schedule (Windows) | You weren't logged in, or the PC was off | It runs at your next login (the task catches up). Logged-in-but-locked is fine |

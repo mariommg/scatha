@@ -62,7 +62,7 @@ What leaves your computer: your X session talks to X (it's your login, used the 
 
 ## Honest caveats
 
-- **bird is frozen.** Smaug reads X through [bird](https://www.npmjs.com/package/@steipete/bird), whose author has stopped maintaining it (version 0.8.0 is the last). It works today. If X changes its internals, it may stop, and there's no upstream to fix it.
+- **X can change under us.** Smaug reads X with a copy of the client code from [bird](https://www.npmjs.com/package/@steipete/bird), kept in `smaug/vendor/bird/`. bird's author has stopped maintaining it, so when X changes its internals, the fix lands here, not upstream. If you also install bird 0.8.0, it's tried as a backup whenever the built-in client fails.
 - **This uses your X session cookies** for automated reading, which X's terms don't love. It only reads your own bookmarks, at a modest pace, but it's your account and your call.
 - **Windows is the tested path.** The macOS (launchd) and Linux (systemd) schedulers are written to spec and haven't had their first real run yet. If you're the first, tell me how it went.
 - **Video is invisible.** A post whose substance is a video gets a short, honest note that says so, plus the link.
@@ -74,4 +74,4 @@ What leaves your computer: your X session talks to X (it's your login, used the 
 
 ## Credits
 
-Built on [Smaug](https://github.com/alexknowshtml/smaug) by Alex Hillman (MIT; vendored here with changes, listed in `smaug/CHANGES-smaug-jev.md`), [bird](https://www.npmjs.com/package/@steipete/bird) by Peter Steinberger, [Jev](https://typesafe.ai) by TypeSafe, Mozilla's [Readability](https://github.com/mozilla/readability), and Claude.
+Built on [Smaug](https://github.com/alexknowshtml/smaug) by Alex Hillman (MIT; vendored here with changes, listed in `smaug/CHANGES-smaug-jev.md`), [bird](https://www.npmjs.com/package/@steipete/bird) by Peter Steinberger (MIT; its X client is vendored in `smaug/vendor/bird/`), [Jev](https://typesafe.ai) by TypeSafe, Mozilla's [Readability](https://github.com/mozilla/readability), and Claude.

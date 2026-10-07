@@ -2,24 +2,24 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { isPaywalled, stripQuerystring, fetchXArticleContent } from '../src/processor.js';
+import { loadConfig } from '../src/config.js';
+import { x } from '../src/x.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Check if bird CLI has valid credentials
-function hasBirdCredentials() {
+// Live tests run only when X accepts the cookies in the environment
+async function hasXCredentials() {
   try {
-    // Quick check - if bird can fetch 1 bookmark without error, we have credentials
-    execSync('bird bookmarks -n 1 --json', { encoding: 'utf8', timeout: 10000, stdio: 'pipe' });
+    await x.whoami(loadConfig());
     return true;
   } catch {
     return false;
   }
 }
 
-const BIRD_AVAILABLE = hasBirdCredentials();
+const X_AVAILABLE = await hasXCredentials();
 
 describe('X article URL detection', () => {
   test('detects X article URL pattern', () => {
@@ -580,12 +580,12 @@ describe('fetchBookmarks count truncation', () => {
 });
 
 // Integration tests - only run when bird CLI has valid credentials
-describe('X article integration tests (requires bird credentials)', { skip: !BIRD_AVAILABLE }, () => {
-  // These tests require actual Twitter/X API access via bird CLI
-  // They will be skipped if bird credentials are not configured
+describe('X article integration tests (requires X credentials)', { skip: !X_AVAILABLE }, () => {
+  // These tests require actual X API access
+  // They will be skipped if X credentials are not configured
 
   test('fetches real X article content when credentials available', async () => {
-    if (!BIRD_AVAILABLE) {
+    if (!X_AVAILABLE) {
       return; // Skip if no credentials
     }
 
@@ -607,7 +607,7 @@ describe('X article integration tests (requires bird credentials)', { skip: !BIR
   });
 
   test('handles non-existent article gracefully', async () => {
-    if (!BIRD_AVAILABLE) {
+    if (!X_AVAILABLE) {
       return;
     }
 

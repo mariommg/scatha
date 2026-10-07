@@ -9,11 +9,13 @@
  *   fetch    - Fetch bookmarks and prepare them for processing
  *   process  - Process pending bookmarks with Claude Code
  *   status   - Show current configuration and status
+ *   whoami   - Check the X login (prints "user: @handle")
  *   init     - Create a config file (non-interactive)
  */
 
 import { fetchAndPrepareBookmarks } from './processor.js';
 import { initConfig, loadConfig } from './config.js';
+import { x } from './x.js';
 import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
@@ -45,43 +47,14 @@ async function setup() {
 This will set up Smaug to automatically archive your Twitter bookmarks.
 `);
 
-  // Step 1: Check for bird CLI with bookmarks support (v0.5.0+)
-  console.log('Step 1: Checking for bird CLI...');
+  // Step 1: bird CLI is optional; Smaug carries its own X client and uses bird only as a backup
+  console.log('Step 1: Checking for the bird CLI (optional backup)...');
   try {
     const versionOutput = execSync('bird --version', { stdio: 'pipe', encoding: 'utf8' });
     const versionMatch = versionOutput.match(/(\d+)\.(\d+)\.(\d+)/);
-
-    if (versionMatch) {
-      const [, major, minor] = versionMatch.map(Number);
-      if (major === 0 && minor < 5) {
-        console.log(`  ✗ bird CLI v${versionMatch[0]} found, but v0.5.0+ required for bookmarks support
-
-  Update it:
-    npm install -g @steipete/bird@latest
-
-  Or with Homebrew:
-    brew upgrade steipete/tap/bird
-
-  Then run this setup again.
-`);
-        process.exit(1);
-      }
-      console.log(`  ✓ bird CLI v${versionMatch[0]} found (bookmarks supported)\n`);
-    } else {
-      console.log('  ✓ bird CLI found\n');
-    }
+    console.log(`  ✓ bird CLI${versionMatch ? ` v${versionMatch[0]}` : ''} found; used if the built-in X client fails\n`);
   } catch {
-    console.log(`  ✗ bird CLI not found
-
-  Install it:
-    npm install -g @steipete/bird@latest
-
-  Or with Homebrew:
-    brew install steipete/tap/bird
-
-  Then run this setup again.
-`);
-    process.exit(1);
+    console.log(`  - bird CLI not found. Not required. For a backup: npm install -g @steipete/bird@0.8.0\n`);
   }
 
   // Step 2: Get Twitter credentials
@@ -111,9 +84,8 @@ This will set up Smaug to automatically archive your Twitter bookmarks.
   // Step 3: Test credentials
   console.log('\nStep 3: Testing credentials...');
   try {
-    const env = { ...process.env, AUTH_TOKEN: authToken, CT0: ct0 };
-    execSync('bird bookmarks -n 1 --json', { env, stdio: 'pipe', timeout: 30000 });
-    console.log('  ✓ Credentials work!\n');
+    const me = await x.whoami({ ...loadConfig(), twitter: { authToken, ct0 } });
+    console.log(`  ✓ Credentials work! Signed in as @${me.username}\n`);
   } catch (error) {
     console.log(`  ✗ Could not fetch bookmarks. Check your credentials and try again.
   Error: ${error.message}
@@ -205,6 +177,19 @@ async function main() {
     case 'init':
       initConfig(args[1]);
       break;
+
+    case 'whoami': {
+      // "user: @handle (Name)", the line bird's whoami printed; callers check for it
+      try {
+        const me = await x.whoami(loadConfig());
+        console.log(`user: @${me.username}${me.name ? ` (${me.name})` : ''}`);
+        console.log(x.summary());
+      } catch (error) {
+        console.error(`Could not sign in to X: ${error.message}`);
+        process.exit(1);
+      }
+      break;
+    }
 
     case 'run': {
       // Run the full job (same as node src/job.js)
