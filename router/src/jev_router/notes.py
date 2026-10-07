@@ -354,7 +354,55 @@ def render(b: dict, r: dict, note: dict, words: int) -> str:
     if links:
         body += ["", "## Links", ""]
         body += [f"- [{_slug_title(l['title']) if l.get('title') else l['url']}]({l['url']})" for l in links]
+    extra = full_text(b)
+    if extra:
+        body += [""] + extra
     return "\n".join(fm + [""] + body) + "\n"
+
+
+# ---------- full text: a folded copy of the source material, against link rot ----------
+
+FULL_TEXT = "> [!abstract]- Full text"
+
+
+def _quoted(text: str) -> list[str]:
+    return [f"> {line}" if line.strip() else ">" for line in text.strip().splitlines()]
+
+
+def full_text(b: dict) -> list[str]:
+    """Everything the note was written from except the post itself (already under 'The post'), uncut."""
+    sections, seen = [], {str(b.get("id"))}
+
+    def tweet(label: str, t: dict | None) -> None:
+        key = str(t.get("id") or t.get("text")) if t else None
+        if not t or not t.get("text") or key in seen:
+            return
+        seen.add(key)
+        url = t.get("tweetUrl")
+        head = f"**{label} @{t.get('author')}**" + (f" ([on X]({url}))" if url else "")
+        sections.append([head, ""] + html.unescape(t["text"]).strip().splitlines())
+
+    tweet("In reply to", b.get("replyContext"))
+    tweet("Quoting", b.get("quoteContext"))
+    tweet("Which quotes", b.get("nestedQuote"))
+    if b.get("imageText"):
+        sections.append(["**Text in the images** (transcribed)", ""] + b["imageText"].strip().splitlines())
+    for l in b.get("links", []):
+        if l.get("type") == "tweet":
+            tweet("Linked post by", l.get("content"))
+    for l in _linked(b):
+        title = _slug_title(l["title"]) if l.get("title") else l["url"]
+        if l.get("text"):
+            sections.append([f"**[{title}]({l['url']})**", ""] + l["text"].strip().splitlines())
+        elif l.get("summary"):
+            sections.append([f"**[{title}]({l['url']})** (summary only; the full text was not fetched)", ""]
+                            + l["summary"].strip().splitlines())
+    if not sections:
+        return []
+    lines = [FULL_TEXT]
+    for i, s in enumerate(sections):
+        lines += ([">"] if i else []) + _quoted("\n".join(s))
+    return lines
 
 
 def existing_ids(folder: Path) -> set[str]:
@@ -431,6 +479,42 @@ def cmd_write(args) -> dict:
     return {"written": written, "failed": failed, "present": present, "tokens": tokens}
 
 
+def cmd_backfill(args) -> None:
+    """Append the full-text callout to notes written before it existed. No LLM, no fetch; idempotent."""
+    bms = {}
+    for p in args.pending:
+        for b in json.loads(Path(p).read_text(encoding="utf-8"))["bookmarks"]:
+            bms[str(b["id"])] = b
+    added, has, empty, unknown = [], 0, 0, 0
+    for folder in args.notes:
+        for f in sorted(Path(folder).rglob("*.md")):
+            text = f.read_text(encoding="utf-8")
+            m = re.search(r'^tweet_id: "(\d+)"', text, re.M)
+            if not m:
+                continue
+            if args.ids and m.group(1) not in args.ids:
+                continue
+            b = bms.get(m.group(1))
+            if b is None:
+                unknown += 1
+                continue
+            if FULL_TEXT in text:
+                has += 1
+                continue
+            extra = full_text(b)
+            if not extra:
+                empty += 1
+                continue
+            added.append(f)
+            if args.apply:
+                f.write_text(text.rstrip("\n") + "\n\n" + "\n".join(extra) + "\n", encoding="utf-8")
+    verb = "added to" if args.apply else "would be added to (dry run; pass --apply)"
+    print(f"full text {verb} {len(added)} notes; {has} already had it; {empty} have nothing beyond the post; "
+          f"{unknown} notes have no raw bookmark in the given files")
+    for f in added[:args.show]:
+        print(f"  {f}")
+
+
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # Windows consoles default to cp1252
     ap = argparse.ArgumentParser()
@@ -444,8 +528,14 @@ def main() -> None:
     w.add_argument("--out", default="notes-preview")
     w.add_argument("--ids", nargs="*")
     w.add_argument("--to-vault", action="store_true")
+    f = sub.add_parser("backfill")
+    f.add_argument("--pending", nargs="+", required=True)
+    f.add_argument("--notes", nargs="+", required=True)
+    f.add_argument("--ids", nargs="*")
+    f.add_argument("--apply", action="store_true")
+    f.add_argument("--show", type=int, default=5)
     args = ap.parse_args()
-    {"describe": cmd_describe, "write": cmd_write}[args.cmd](args)
+    {"describe": cmd_describe, "write": cmd_write, "backfill": cmd_backfill}[args.cmd](args)
 
 
 if __name__ == "__main__":
