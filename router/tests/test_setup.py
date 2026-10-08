@@ -92,3 +92,54 @@ def test_secrets_file_is_private(home):
 def test_scratch_data_folder_gets_its_own_task(home):
     assert app.task_name() != app.TASK_NAME and app.task_name().startswith(app.TASK_NAME + "-")
     assert f"-TaskName '{app.task_name()}'" in scheduler.windows_ps({"cadence": "daily", "time": "01:00"}, home / "run.ps1")
+
+
+def answers(monkeypatch, *typed):
+    """Feed the wizard's input() prompts in order; fail loudly if it asks for more."""
+    it = iter(typed)
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(it))
+
+
+@pytest.mark.parametrize("typed,expected", [("", "Science"), ("TIL", "TIL"), ("-", None)])
+def test_subfolder_enter_takes_the_suggestion_and_dash_means_none(tmp_path, monkeypatch, typed, expected):
+    answers(monkeypatch, typed)
+    got = onboard.pick_subfolder(tmp_path, "Science")
+    assert got == (tmp_path / expected if expected else tmp_path)
+
+
+def test_choose_asks_before_listing_options(monkeypatch, capsys):
+    answers(monkeypatch, "2")
+    assert onboard.choose("Which day?", ["Friday", "Saturday"]) == 2
+    out = capsys.readouterr().out
+    assert out.index("Which day?") < out.index("Friday")
+
+
+def test_topic_folders_are_reviewed_before_saving(home, tmp_path, monkeypatch, capsys):
+    vault = tmp_path / "Commonplace Book"
+    (vault / ".obsidian").mkdir(parents=True)
+    (vault / "AI").mkdir()
+    monkeypatch.setattr(onboard.vaults, "find_vaults", lambda: [vault])
+    picked = [{"label": "AI", "preset": True, "destination": str(vault / "AI")},
+              {"label": "General knowledge", "preset": True, "destination": str(vault / "TLM")}]
+    answers(monkeypatch, "2", "1", "TIL", "")  # change row 2: same vault, fix the typo; then save
+    assert onboard.step_topics(app.load_config(), picked, draft=False)
+    out = capsys.readouterr().out
+    assert "TLM" in out and "(new)" in out  # the typo was on screen, flagged as a folder that doesn't exist
+    tax = Taxonomy.load(home / "topics.yaml")
+    assert [t.destination for t in tax.topics] == [str(vault / "AI"), str(vault / "TIL")]
+
+
+def test_new_topics_default_to_one_vault_with_a_subfolder_each(home, tmp_path, monkeypatch):
+    vault = tmp_path / "Notes"
+    vault.mkdir()
+    monkeypatch.setattr(onboard.vaults, "find_vaults", lambda: [vault])
+    picked = [{"label": "AI", "preset": True}, {"label": "Journalism", "preset": True}]
+    answers(monkeypatch, "1", "")  # the vault, then save the review as shown
+    assert onboard.step_topics(app.load_config(), picked, draft=False)
+    assert [t.destination for t in Taxonomy.load(home / "topics.yaml").topics] == [str(vault / "AI"), str(vault / "Journalism")]
+
+
+def test_wizard_points_at_the_setup_script_not_a_bare_command(monkeypatch):
+    for platform, script in [("win32", r".\setup.ps1 x-login"), ("linux", "./setup.sh x-login")]:
+        monkeypatch.setattr(onboard.sys, "platform", platform)
+        assert onboard.setup_cmd("x-login") == script
