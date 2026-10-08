@@ -120,6 +120,7 @@ Start with `setup status`; it shows what's configured and the newest log.
 - **Claude Code** draws on your plan's usage window. One Pro user saw about a quarter of a 5-hour window per 100 notes; long articles and image-heavy posts cost more.
 - **Anthropic API** is roughly a cent per note with Haiku.
 - **X** gets one request per bookmark list page plus a few per bookmark (threads, quotes, profiles). A batch of 100 takes a few minutes. Keep batches modest; it's your account.
+- **One X account.** scatha reads one account's bookmarks per computer. Support for several accounts is on the roadmap but not built yet; until then, a second install would share the first one's saved login (on Windows) and run on its own schedule, so don't set one up.
 
 Batch size lives in `config.json` (or `setup schedule`). For a big backlog, a larger batch clears it sooner at the cost of a bigger bite out of one usage window.
 

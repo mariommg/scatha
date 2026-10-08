@@ -21,7 +21,7 @@ It runs while you sleep. You wake up to notes.
 ## What you need
 
 - **Node.js 22+** and **[uv](https://docs.astral.sh/uv/)**
-- **An X account** you're logged in to in a browser
+- **An X account** you're logged in to in a browser. One account per computer for now; support for several is on the roadmap but not built yet.
 - **A TypeSafe API key** for Jev ([typesafe.ai](https://typesafe.ai)); a few cents covers hundreds of bookmarks
 - **Claude Code**, logged in (uses your Claude plan), *or* an **Anthropic API key** (pay as you go)
 - **Obsidian** if you want notes in a vault (optional; the notes are plain Markdown)
