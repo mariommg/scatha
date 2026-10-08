@@ -182,6 +182,52 @@ def install(cfg: dict) -> str:
     return ("No systemd here. Add this line with 'crontab -e':\n    " + cron_line(sched, wrapper))
 
 
+def installed() -> bool | None:
+    """Is this install's schedule registered? None where it can't be told (a crontab line)."""
+    stem = app.task_name().lower()
+    if sys.platform == "win32":
+        return subprocess.run(["schtasks", "/Query", "/TN", app.task_name()], capture_output=True).returncode == 0
+    if sys.platform == "darwin":
+        return (Path.home() / "Library/LaunchAgents" / f"com.{stem}.plist").exists()
+    if shutil.which("systemctl"):
+        return (Path.home() / ".config/systemd/user" / f"{stem}.timer").exists()
+    return None
+
+
+def scheduler_env() -> dict:
+    """The environment a scheduled run starts with, as near as setup can tell: no venv from
+    'uv run', no secrets or settings setup loaded into its own process, and on Windows the
+    PATH rebuilt from the registry the way Task Scheduler builds it."""
+    drop = {"VIRTUAL_ENV", "CLAUDE_BIN", "NOTES_BACKEND", "READER_PROFILE", "AUTH_TOKEN", "CT0", *app.SECRETS.values()}
+    env = {k: v for k, v in os.environ.items() if k not in drop}
+    venv = os.environ.get("VIRTUAL_ENV")
+    paths = [p for p in env.get("PATH", "").split(os.pathsep) if not (venv and p.startswith(venv))]
+    if sys.platform == "win32":
+        try:
+            import winreg
+            parts = []
+            for hive, key in [(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Control\Session Manager\Environment"),
+                              (winreg.HKEY_CURRENT_USER, "Environment")]:
+                with winreg.OpenKey(hive, key) as k:
+                    try:
+                        parts.append(os.path.expandvars(winreg.QueryValueEx(k, "Path")[0]))
+                    except FileNotFoundError:
+                        pass
+            paths = os.pathsep.join(parts).split(os.pathsep)
+        except OSError:
+            pass
+    env["PATH"] = os.pathsep.join(p for p in paths if p)
+    return env
+
+
+def run_now(args: list[str]) -> int:
+    """Run the scheduled script itself, in a fresh shell, the way the scheduler would."""
+    wrapper = write_wrapper()
+    cmd = (["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(wrapper), *args]
+           if sys.platform == "win32" else ["/bin/bash", str(wrapper), *args])
+    return subprocess.run(cmd, cwd=wrapper.parent, env=scheduler_env()).returncode
+
+
 def remove() -> str:
     stem = app.task_name().lower()
     if sys.platform == "win32":

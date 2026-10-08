@@ -22,13 +22,13 @@ Everything you might need after setup, roughly in the order you'll need it. The 
 4. Optional: open `docs/onboarding.html`, plan your topics and schedule, and download `my-setup.json`.
 5. Run `setup` (add `--answers path/to/my-setup.json` if you made one).
 
-The wizard runs seven steps: tools, X login, Jev, Haiku, topics and folders, schedule, and a test drive. Each secret is typed into a hidden prompt and checked against the real service before it's stored. If you stop partway (Ctrl+C), the finished steps stay saved; run `setup` again to finish.
+The wizard runs seven steps: tools, X login, Jev, Haiku, topics and folders, schedule, and a test drive. Each secret is typed into a hidden prompt and checked against the real service before it's stored. Run `setup` again any time. It checks every step (the logins live, which takes a few seconds), shows what's already set, and goes straight to whatever is missing or broken: a setup you stopped partway resumes where you left off, and an expired login gets fixed without redoing the rest. If everything works, it offers to change any one step. The test drive runs the scheduled script itself, in a fresh shell, so it proves what the scheduler will see.
 
 ## 2. What a run does
 
 On schedule (default: Saturdays at 00:01), the runner:
 
-1. Checks your X login. If it's expired, it stops and tells you (log, and phone ping if you set up ntfy).
+1. Checks that your X login, Jev, and the note writer all answer. If one doesn't, it stops before fetching and tells you which: a desktop notification, the log, and a phone ping if you set up ntfy.
 2. Fetches up to *batch size* bookmarks you haven't processed yet, newest first. Threads, quoted posts, linked articles, and images come along.
 3. Reads the images on posts that are mostly pictures.
 4. Asks Jev which topic each bookmark fits. Below the threshold on every topic means skipped.
@@ -100,18 +100,18 @@ When a bookmark lands in the wrong place, open that run's `work/runs/<date>/rout
 
 ## 6. When something breaks
 
-Start with `setup status`; it shows what's configured and the newest log.
+Start with `setup status`: it checks every step, the three logins live, and shows the newest log. Running `setup` itself does the same check and then fixes whatever failed.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Summary says your X login expired | You logged out of X, or the session aged out | `setup x-login` with fresh cookies |
+| "Bookmark import stopped before fetching" notification | A login expired, or Claude Code moved or logged out; the message names which | `setup`, which goes straight to the broken step (`setup x-login` for X cookies alone) |
 | Log shows `falling back to bird`, or the fetch fails | X changed something the built-in client depends on | If the backup bird carried the run, nothing is lost yet. Either way, the fix goes in `smaug/vendor/bird/` (see its README) |
 | `claude -p failed` in the log | Claude Code logged out, or you hit your usage window | Run `claude` once to log back in; failed notes retry next run |
 | Some notes failed, `content filtering policy` | Claude declined to read a particular post or image | Nothing to do; that post is filed from its text alone or retried |
 | Nothing ran on schedule (Windows) | You weren't logged in, or the PC was off | It runs at your next login (the task catches up). Logged-in-but-locked is fine |
 | Nothing ran on schedule (macOS) | The Mac was off at the time | launchd runs missed jobs on wake, not after a full shutdown; use `run.sh` |
 | "another run holds the lock" | A run is going, or one crashed in the last 6 hours | Wait, or delete `work/.run.lock` if nothing's running |
-| Jev errors (401/403) | TypeSafe key revoked or out of credit | Re-run `setup` and replace the key |
+| Jev errors (401/403) | TypeSafe key revoked or out of credit | Re-run `setup`; it finds the rejected key and asks for a new one |
 | A topic folder stays empty | Its definition is too narrow, or you just don't bookmark that much of it | Check scores in `routes.md`; widen `yes_means` |
 
 ## 7. Costs and limits

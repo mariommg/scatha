@@ -2,7 +2,7 @@
 
     uv run --project router python -m jev_router.run [--batch N] [--preview] [--force]
 
-Steps: check the X login, fetch the newest unprocessed bookmarks (Smaug), read
+Steps: check that X, Jev, and the note writer all answer, fetch the newest unprocessed bookmarks (Smaug), read
 image posts, route with Jev, write notes, record every processed bookmark in the
 ledger, ping a summary. A bookmark whose note failed stays out of the ledger, so
 the next run picks it up again. All paths come from the data folder (see app.py).
@@ -22,7 +22,7 @@ import subprocess
 import sys
 import urllib.request
 
-from . import Taxonomy, app, notes
+from . import Taxonomy, app, checks, notes
 from .smaug import route_file
 
 # Minimum days between runs per cadence. Schedulers that can't express "every two
@@ -44,6 +44,44 @@ def ping(cfg: dict, text: str) -> None:
         urllib.request.urlopen(req, timeout=20)
     except Exception as e:
         log(f"ntfy failed: {e}")
+
+
+TOAST_PS = r"""
+$ErrorActionPreference = 'Stop'
+[void][Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]
+$x = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
+$t = $x.GetElementsByTagName('text')
+[void]$t.Item(0).AppendChild($x.CreateTextNode($env:NOTIFY_TITLE))
+[void]$t.Item(1).AppendChild($x.CreateTextNode($env:NOTIFY_TEXT))
+$app = '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe'
+[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($app).Show([Windows.UI.Notifications.ToastNotification]::new($x))
+"""
+
+
+def desktop_notify(title: str, text: str) -> None:
+    """Best effort: a Windows toast (tested), macOS notification or Linux notify-send (untested)."""
+    env = os.environ | {"NOTIFY_TITLE": title, "NOTIFY_TEXT": text}
+    if sys.platform == "win32":
+        cmd = ["powershell.exe", "-NoProfile", "-Command", TOAST_PS]  # Windows PowerShell 5.1: WinRT types load there
+    elif sys.platform == "darwin":
+        cmd = ["osascript", "-e", 'display notification (system attribute "NOTIFY_TEXT") '
+                                  'with title (system attribute "NOTIFY_TITLE")']
+    elif shutil.which("notify-send"):
+        cmd = ["notify-send", title, text]
+    else:
+        return
+    try:
+        p = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=30)
+        if p.returncode:
+            log(f"desktop notification failed: {(p.stderr or p.stdout).strip()[:200]}")
+    except Exception as e:
+        log(f"desktop notification failed: {e}")
+
+
+def alert(cfg: dict, text: str) -> None:
+    """A problem only the user can fix: phone ping if set up, and a desktop notification either way."""
+    ping(cfg, text)
+    desktop_notify(f"{app.APP_NAME} needs you", text)
 
 
 def sh(cmd: list[str], cwd, env=None) -> tuple[int, str]:
@@ -125,11 +163,15 @@ def main(argv: list[str] | None = None) -> int:
         tax_path = app.taxonomy_path(cfg)
         tax = Taxonomy.load(tax_path)
 
-        # 1. X login still good?
-        code, out = sh([cfg["tools"]["node"], "src/cli.js", "whoami"], app.REPO / "smaug", env=smaug_env(cfg))
-        if code != 0 or "user:" not in out:
-            ping(cfg, "Bookmark import stopped: your X login has expired. Run the setup's 'x-login' step "
-                      "with fresh cookies and it will pick up next run.")
+        # 1. X login, Jev, and the note writer all answering? Stop before touching X if not.
+        log("checking X login, Jev, and the note writer")
+        problems = checks.preflight(cfg)
+        if problems:
+            for p in problems:
+                log(f"pre-flight: {p}")
+            alert(cfg, f"Bookmark import stopped before fetching: {'; '.join(problems)}. To fix it, run "
+                       f"{app.setup_command()} in {app.REPO}; setup finds what's broken and asks only about that. "
+                       "Nothing was lost: the next run picks up where this one would have.")
             return 2
 
         # 2. Fetch, or resume a run that stopped after fetching
@@ -140,7 +182,7 @@ def main(argv: list[str] | None = None) -> int:
             code, out = sh([cfg["tools"]["node"], "src/cli.js", "fetch", "1000", "--limit", str(batch)],
                            app.REPO / "smaug", env=smaug_env(cfg))
             if code != 0:
-                ping(cfg, "Bookmark import failed while fetching from X. The newest log in the data folder has details.")
+                alert(cfg, "Bookmark import failed while fetching from X. The newest log in the data folder has details.")
                 return 3
             m = re.search(r"Limiting to \d+ of (\d+) unprocessed", out)
             remaining = int(m.group(1)) - batch if m else 0

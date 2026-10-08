@@ -143,3 +143,77 @@ def test_wizard_points_at_the_setup_script_not_a_bare_command(monkeypatch):
     for platform, script in [("win32", r".\setup.ps1 x-login"), ("linux", "./setup.sh x-login")]:
         monkeypatch.setattr(onboard.sys, "platform", platform)
         assert onboard.setup_cmd("x-login") == script
+
+
+def states(**broken):
+    """A recap where every step works except the ones named, e.g. states(s2="cookies dead")."""
+    return {n: (f"s{n}" not in broken, broken.get(f"s{n}", "fine")) for n in range(1, 7)}
+
+
+def test_rerun_fixes_only_whats_broken(home, monkeypatch, capsys):
+    app.save_config({})
+    monkeypatch.setattr(onboard, "assess", lambda cfg: states(s2="saved cookies stopped working"))
+    ran = []
+    monkeypatch.setattr(onboard, "run_step", lambda n, *a: ran.append(n) or True)
+    assert onboard.onboard({}) == 0
+    assert ran == [2, 7]  # the broken login, then the offer of a test drive
+    assert "Picking up at step 2 (X login)" in capsys.readouterr().out
+
+
+def test_stopped_setup_resumes_at_the_first_unfinished_step(home, monkeypatch):
+    app.save_config({})
+    monkeypatch.setattr(onboard, "assess", lambda cfg: states(s5="not set up yet", s6="not scheduled"))
+    ran = []
+    monkeypatch.setattr(onboard, "run_step", lambda n, *a: ran.append(n) or True)
+    onboard.onboard({})
+    assert ran == [5, 6, 7]
+
+
+def test_working_install_offers_changes_instead_of_rerunning(home, monkeypatch):
+    app.save_config({})
+    monkeypatch.setattr(onboard, "assess", lambda cfg: states())
+    ran = []
+    monkeypatch.setattr(onboard, "run_step", lambda n, *a: ran.append(n) or True)
+    answers(monkeypatch, "5", "")  # change topics, then done
+    assert onboard.onboard({}) == 0
+    assert ran == [5]
+
+
+def test_first_run_goes_through_every_step(home, monkeypatch):
+    ran = []
+    monkeypatch.setattr(onboard, "run_step", lambda n, *a: ran.append(n) or True)
+    onboard.onboard({})
+    assert ran == [1, 2, 3, 4, 5, 6, 7]
+
+
+def test_preflight_names_a_moved_claude_without_calling_it(monkeypatch, tmp_path):
+    from jev_router import checks
+    monkeypatch.setattr(checks, "verify_x", lambda cfg: "@me")
+    monkeypatch.setattr(checks, "verify_typesafe", lambda: None)
+    node = tmp_path / "node.exe"
+    node.write_text("")
+    gone = str(tmp_path / "old" / "claude.exe")
+    cfg = app.load_config() | {"tools": {"node": str(node), "bird": "bird", "claude": gone}}
+    problems = checks.preflight(cfg)
+    assert len(problems) == 1 and "Claude Code" in problems[0] and gone in problems[0]
+
+
+def test_failed_preflight_alerts_and_stops_before_fetching(home, monkeypatch):
+    from jev_router import checks, run
+    (home / "topics.yaml").write_text("topics: []\n")
+    monkeypatch.setattr(run, "Taxonomy", type("T", (), {"load": staticmethod(lambda p: None)}))
+    monkeypatch.setattr(checks, "preflight", lambda cfg: ["your X login has expired"])
+    alerts = []
+    monkeypatch.setattr(run, "alert", lambda cfg, text: alerts.append(text))
+    monkeypatch.setattr(run, "sh", lambda *a, **k: pytest.fail("fetched despite a failed pre-flight"))
+    assert run.main(["--force"]) == 2
+    assert "X login has expired" in alerts[0] and app.setup_command() in alerts[0]
+
+
+def test_scheduler_env_drops_what_setup_loaded(monkeypatch):
+    monkeypatch.setenv("VIRTUAL_ENV", "/x/venv")
+    monkeypatch.setenv("TYPESAFE_API_KEY", "k")
+    monkeypatch.setenv("CLAUDE_BIN", "/c")
+    env = scheduler.scheduler_env()
+    assert not {"VIRTUAL_ENV", "TYPESAFE_API_KEY", "CLAUDE_BIN"} & set(env)
+    assert "/x/venv" not in env["PATH"]

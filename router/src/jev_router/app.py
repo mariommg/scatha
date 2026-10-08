@@ -59,6 +59,11 @@ def task_name() -> str:
     return f"{TASK_NAME}-" + "".join(c for c in home().name if c.isalnum() or c in "-_").strip("-_")
 
 
+def setup_command(sub: str = "") -> str:
+    """How the user runs setup on this OS, from the project folder (there is no command on PATH)."""
+    return ((r".\setup.ps1" if sys.platform == "win32" else "./setup.sh") + f" {sub}").rstrip()
+
+
 def work() -> Path:
     return home() / "work"
 

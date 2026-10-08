@@ -31,7 +31,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import app, scheduler, topics, vaults
+from . import app, checks, scheduler, topics, vaults
+from .checks import verify_notes, verify_typesafe, verify_x
 
 # ---------- output ----------
 
@@ -92,9 +93,7 @@ def question(text: str) -> None:
     say(f"  {bold(text)}")
 
 
-def setup_cmd(sub: str = "") -> str:
-    """How the user re-runs setup on this OS (there is no 'onboard' command on PATH)."""
-    return ((r".\setup.ps1" if sys.platform == "win32" else "./setup.sh") + f" {sub}").rstrip()
+setup_cmd = app.setup_command
 
 
 def table(header: list[str], rows: list[list[str]], marks: list[str] | None = None, indent: int = 4) -> None:
@@ -160,38 +159,6 @@ def node_major(node: str) -> int:
         return int(re.match(r"v(\d+)", out).group(1))
     except Exception:
         return 0
-
-
-def verify_x(cfg: dict) -> str | None:
-    """Returns the @handle X sees, or None."""
-    from .run import smaug_env
-    app.load_secrets()
-    p = subprocess.run([cfg["tools"]["node"], "src/cli.js", "whoami"], cwd=app.REPO / "smaug", env=smaug_env(cfg),
-                       capture_output=True, text=True, encoding="utf-8", errors="replace")
-    m = re.search(r"user:\s*(@\S+)", p.stdout)
-    return m.group(1) if m else None
-
-
-def verify_typesafe() -> str | None:
-    """Returns None if the key works, else the error."""
-    try:
-        from typesafe_sdk import Noul, TypeSafeClient
-        r = TypeSafeClient(model=topics.MODEL).system_one("The sky is blue.", {"q": Noul(instructions="Is this about color?")})
-        float(r.answers["q"].noul)
-        return None
-    except Exception as e:
-        return f"{type(e).__name__}: {e}"
-
-
-def verify_notes(cfg: dict) -> str | None:
-    from . import notes
-    os.environ["NOTES_BACKEND"] = cfg["notes_backend"]
-    os.environ["CLAUDE_BIN"] = cfg["tools"]["claude"]
-    try:
-        answer, _ = notes.haiku([{"type": "text", "text": "Reply with the single word: ready"}])
-        return None if "ready" in str(answer).lower() else f"unexpected reply: {answer!r}"
-    except Exception as e:
-        return f"{type(e).__name__}: {e}"
 
 
 # ---------- steps ----------
@@ -503,35 +470,118 @@ def step_reader(cfg: dict, preset: str | None = None) -> None:
 def step_test(cfg: dict) -> None:
     if not yes("Try it now on your 5 newest bookmarks? Notes go to a preview folder, not your vaults."):
         return
-    from . import run
-    run.main(["--preview", "--batch", "5", "--force"])
+    hint("Running the scheduled script itself, in a fresh shell, the way the scheduler will (a minute or two)…")
+    code = scheduler.run_now(["--preview", "--batch", "5", "--force"])
+    logs = sorted((app.work() / "logs").glob("*.log"))
+    lines = logs[-1].read_text(encoding="utf-8-sig", errors="replace").splitlines() if logs else []
+    for line in lines:
+        if "summary:" in line or "pre-flight:" in line:
+            say(f"    {line.split('] ', 1)[-1]}")
     say()
-    ok(f"Preview notes: {app.work() / 'notes-preview'}")
+    if code:
+        bad(f"The test run stopped (exit {code}). The log says why: {logs[-1] if logs else app.work() / 'logs'}")
+        return
+    ok(f"The scheduled script works. Preview notes: {app.work() / 'notes-preview'}")
     hint("Nothing was recorded, so the first real run picks these up again.")
+
+
+# ---------- where things stand ----------
+
+STEPS = {1: "Tools", 2: "X login", 3: "Jev (sorting)", 4: "Haiku (writing notes)",
+         5: "Topics and folders", 6: "Schedule", 7: "Test drive"}
+
+
+def assess(cfg: dict) -> dict[int, tuple[bool, str]]:
+    """Steps 1-6: (working?, what's set). The three logins get a live check, so this takes a few seconds."""
+    app.load_secrets()
+    s: dict[int, tuple[bool, str]] = {}
+    node = checks.found(cfg["tools"]["node"])
+    major = node_major(node) if node else 0
+    s[1] = ((True, f"Node.js {major}" + (", bird backup" if checks.found(cfg["tools"]["bird"]) else ""))
+            if major >= 22 else (False, f"Node.js 22+ not found at {cfg['tools']['node']}"))
+
+    if not app.has_secret("AUTH_TOKEN"):
+        s[2] = (False, "not set up yet")
+    elif not s[1][0]:
+        s[2] = (False, "can't check without Node.js (step 1)")
+    else:
+        handle = verify_x(cfg)
+        s[2] = (True, f"X sees {handle}") if handle else (False, "saved cookies stopped working (logged out of X?)")
+
+    if not app.has_secret(app.SECRETS["typesafe"]):
+        s[3] = (False, "not set up yet")
+    else:
+        err = verify_typesafe()
+        s[3] = (True, "key works") if not err else (False, f"key rejected ({err[:60]})")
+
+    writer = "Claude Code" if cfg["notes_backend"] == "claude-code" else "Anthropic API"
+    if cfg["notes_backend"] == "anthropic-api" and not app.has_secret(app.SECRETS["anthropic"]):
+        s[4] = (False, "not set up yet")
+    elif cfg["notes_backend"] == "claude-code" and cfg["tools"]["claude"] == "claude" and not checks.found("claude"):
+        s[4] = (False, "not set up yet")
+    else:
+        err = verify_notes(cfg)
+        extra = "; about you: set" if cfg.get("reader_profile") else ""
+        s[4] = (True, f"{writer}, answering{extra}") if not err else (False, f"{writer}: {err[:80]}")
+
+    tax = app.taxonomy_path(cfg)
+    if tax.exists():
+        from . import Taxonomy
+        labels = [t.label or t.key for t in Taxonomy.load(tax).topics]
+        s[5] = (True, f"{len(labels)}: {', '.join(labels)}")
+    else:
+        s[5] = (False, "not set up yet")
+
+    there = scheduler.installed()
+    when = f"{scheduler.describe(cfg['schedule'])}, {cfg['batch_size']} per run"
+    s[6] = ((True, when) if there else (True, when + " (crontab; can't check)") if there is None
+            else (False, "not scheduled"))
+    return s
+
+
+def show_recap(states: dict[int, tuple[bool, str]]) -> None:
+    width = max(len(STEPS[n]) for n in states)
+    for n, (good, detail) in states.items():
+        mark = green("✓") if good else red("✗")
+        say(f"    {mark} {n}  {STEPS[n].ljust(width)}  {detail if good else red(detail)}")
+
+
+def run_step(n: int, cfg: dict, answers: dict, verify: bool) -> bool:
+    heading(n, len(STEPS), STEPS[n])
+    if n == 1:
+        good = step_prereqs(cfg)
+        app.save_config(cfg)
+        return good
+    if n == 2:
+        return step_x(cfg, verify)
+    if n == 3:
+        return step_typesafe(verify)
+    if n == 4:
+        if not step_notes(cfg, answers.get("notes_backend"), verify):
+            return False
+        app.save_config(cfg)
+        step_reader(cfg, answers.get("reader_profile"))
+        return True
+    if n == 5:
+        return step_topics(cfg, answers.get("topics"), answers.get("draft_definitions"))
+    if n == 6:
+        step_ntfy(cfg, answers.get("ntfy_topic"))
+        return step_schedule(cfg, answers.get("schedule"), answers.get("batch_size"))
+    step_test(cfg)
+    return True
 
 
 # ---------- commands ----------
 
 def status() -> None:
     cfg = app.load_config()
-    app.load_secrets()
     say(bold(f"{app.APP_NAME} status"))
     say(f"  data folder   {app.home()}")
-    say(f"  config        {green('✓') if app.config_path().exists() else red('✗') + ' missing (run ' + setup_cmd() + ')'}")
-    tax = app.taxonomy_path(cfg)
-    if tax.exists():
-        from . import Taxonomy
-        t = Taxonomy.load(tax)
-        say(f"  topics        {', '.join((x.label or x.key) for x in t.topics)}")
-    else:
-        say(f"  topics        {red('✗')} missing (run {setup_cmd('topics')})")
-    for name, var in app.SECRETS.items():
-        if name == "anthropic" and cfg["notes_backend"] != "anthropic-api":
-            continue
-        saved = os.environ.get(var) or (name.startswith('x_') and os.environ.get(var.replace('TWITTER_', '')))
-        say(f"  {name:<13} {green('✓') + ' saved' if saved else red('✗') + ' missing'}")
-    say(f"  note writer   {cfg['notes_backend']}")
-    say(f"  schedule      {scheduler.describe(cfg['schedule'])}, {cfg['batch_size']} per run")
+    if not app.config_path().exists():
+        bad(f"Not set up yet. From {app.REPO}, run {setup_cmd()}")
+        return
+    hint("Checking the logins (a few seconds)…")
+    show_recap(assess(cfg))
     ledger = app.work() / "ingested.md"
     if ledger.exists():
         say(f"  processed     {sum(1 for l in ledger.read_text(encoding='utf-8').splitlines() if 'x.com/' in l)} bookmarks")
@@ -552,51 +602,57 @@ def load_answers(path: str | None) -> dict:
 
 
 def onboard(answers: dict, verify: bool = True) -> int:
+    """First time: every step in order. After that: a recap, then only the steps that are
+    missing or broken (a stopped setup resumes; an expired login gets fixed), or, when
+    everything works, a menu to change any one step."""
     cfg = app.load_config()
-    total = 7
     say()
     say(cyan(f"{app.APP_NAME} setup"))
     say("Your X bookmarks, sorted into your topics and written up as notes, on a schedule.")
     say(f"Everything you set here lives in {app.home()} (secrets excepted; I'll say where each one goes).")
-    hint("Enter takes the answer in [brackets]. Ctrl+C stops; finished steps stay saved.")
+    hint("Enter takes the answer in [brackets]. Ctrl+C stops; run setup again to pick up where you left off.")
 
-    heading(1, total, "Tools")
-    if not step_prereqs(cfg):
-        return 1
-    app.save_config(cfg)
-    heading(2, total, "X login")
-    if not step_x(cfg, verify):
-        return 1
-    heading(3, total, "Jev (sorting)")
-    if not step_typesafe(verify):
-        return 1
-    heading(4, total, "Haiku (writing notes)")
-    if not step_notes(cfg, answers.get("notes_backend"), verify):
-        return 1
-    app.save_config(cfg)
-    step_reader(cfg, answers.get("reader_profile"))
-    heading(5, total, "Topics and folders")
-    if not step_topics(cfg, answers.get("topics"), answers.get("draft_definitions")):
-        return 1
-    heading(6, total, "Schedule")
-    step_ntfy(cfg, answers.get("ntfy_topic"))
-    if not step_schedule(cfg, answers.get("schedule"), answers.get("batch_size")):
-        return 1
-    heading(7, total, "Test drive")
-    step_test(cfg)
+    todo = list(range(1, 7))
+    if app.config_path().exists():
+        question("Already set up")
+        hint("Checking what works (a few seconds)…")
+        states = assess(cfg)
+        show_recap(states)
+        todo = [n for n, (good, _) in states.items() if not good]
+        if not todo:
+            say()
+            ok("Everything works.")
+            return change_menu(cfg, answers, verify)
+        say()
+        say(f"  Picking up at step {todo[0]} ({STEPS[todo[0]]}). Steps marked ✓ stay as they are.")
+    for n in todo:
+        if not run_step(n, cfg, answers, verify):
+            return 1
+    run_step(7, cfg, answers, verify)
     say()
     say(cyan("All set."))
     say(f"  Handy later, from {app.REPO}:")
     say()
     table(["Command", "What it does"], [
-        [setup_cmd("status"), "what's set up, newest log"],
-        [setup_cmd("x-login"), "when X logs you out"],
-        [setup_cmd("topics"), "change topics or folders"],
-        [setup_cmd("schedule"), "change when it runs"],
+        [setup_cmd(), "check everything; fix what's broken, change anything"],
+        [setup_cmd("status"), "check everything, change nothing; newest log"],
+        [setup_cmd("x-login"), "fresh X cookies, straight away"],
     ])
     say()
     hint("The runbook (docs/RUNBOOK.md) covers the rest.")
     return 0
+
+
+def change_menu(cfg: dict, answers: dict, verify: bool) -> int:
+    while True:
+        say()
+        v = input("  Change something? A step number (1-7, 7 is a test drive), or Enter to finish: ").strip()
+        if not v:
+            return 0
+        if v.isdigit() and int(v) in STEPS:
+            run_step(int(v), cfg, answers, verify)
+        else:
+            say(dim("  (A number from 1 to 7, or Enter.)"))
 
 
 def main(argv: list[str] | None = None) -> int:

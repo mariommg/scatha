@@ -70,7 +70,7 @@ What leaves your computer: your X session talks to X (it's your login, used the 
 
 ## When something breaks
 
-`setup status` shows what's configured and points at the newest log. [docs/RUNBOOK.md](docs/RUNBOOK.md) covers the rest: expired X logins, changing topics, running it right now, costs, and uninstalling.
+`setup status` checks every step, including the logins, and points at the newest log; running `setup` again fixes whatever it finds broken. If a scheduled run can't reach X, Jev, or Claude, it stops before fetching and shows a desktop notification saying what to fix. [docs/RUNBOOK.md](docs/RUNBOOK.md) covers the rest: expired X logins, changing topics, running it right now, costs, and uninstalling.
 
 ## Credits
 
