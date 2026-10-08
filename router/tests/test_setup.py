@@ -198,13 +198,13 @@ def test_preflight_names_a_moved_claude_without_calling_it(monkeypatch, tmp_path
     assert len(problems) == 1 and "Claude Code" in problems[0] and gone in problems[0]
 
 
-def test_failed_preflight_alerts_and_stops_before_fetching(home, monkeypatch):
+def test_failed_preflight_says_why_and_stops_before_fetching(home, monkeypatch):
     from jev_router import checks, run
     (home / "topics.yaml").write_text("topics: []\n")
     monkeypatch.setattr(run, "Taxonomy", type("T", (), {"load": staticmethod(lambda p: None)}))
     monkeypatch.setattr(checks, "preflight", lambda cfg: ["your X login has expired"])
     alerts = []
-    monkeypatch.setattr(run, "alert", lambda cfg, text: alerts.append(text))
+    monkeypatch.setattr(run, "ping", lambda cfg, text: alerts.append(text))
     monkeypatch.setattr(run, "sh", lambda *a, **k: pytest.fail("fetched despite a failed pre-flight"))
     assert run.main(["--force"]) == 2
     assert "X login has expired" in alerts[0] and app.setup_command() in alerts[0]

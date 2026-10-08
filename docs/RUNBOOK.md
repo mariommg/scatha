@@ -28,7 +28,7 @@ The wizard runs seven steps: tools, X login, Jev, Haiku, topics and folders, sch
 
 On schedule (default: Saturdays at 00:01), the runner:
 
-1. Checks that your X login, Jev, and the note writer all answer. If one doesn't, it stops before fetching and tells you which: a desktop notification, the log, and a phone ping if you set up ntfy.
+1. Checks that your X login, Jev, and the note writer all answer. If one doesn't, it stops before fetching and tells you which: in the log, and in a phone ping if you set up ntfy.
 2. Fetches up to *batch size* bookmarks you haven't processed yet, newest first. Threads, quoted posts, linked articles, and images come along.
 3. Reads the images on posts that are mostly pictures.
 4. Asks Jev which topic each bookmark fits. Below the threshold on every topic means skipped.
@@ -104,7 +104,7 @@ Start with `setup status`: it checks every step, the three logins live, and show
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| "Bookmark import stopped before fetching" notification | A login expired, or Claude Code moved or logged out; the message names which | `setup`, which goes straight to the broken step (`setup x-login` for X cookies alone) |
+| Log or ping says "Bookmark import stopped before fetching" | A login expired, or Claude Code moved or logged out; the message names which | `setup`, which goes straight to the broken step (`setup x-login` for X cookies alone) |
 | Log shows `falling back to bird`, or the fetch fails | X changed something the built-in client depends on | If the backup bird carried the run, nothing is lost yet. Either way, the fix goes in `smaug/vendor/bird/` (see its README) |
 | `claude -p failed` in the log | Claude Code logged out, or you hit your usage window | Run `claude` once to log back in; failed notes retry next run |
 | Some notes failed, `content filtering policy` | Claude declined to read a particular post or image | Nothing to do; that post is filed from its text alone or retried |

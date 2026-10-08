@@ -46,44 +46,6 @@ def ping(cfg: dict, text: str) -> None:
         log(f"ntfy failed: {e}")
 
 
-TOAST_PS = r"""
-$ErrorActionPreference = 'Stop'
-[void][Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]
-$x = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)
-$t = $x.GetElementsByTagName('text')
-[void]$t.Item(0).AppendChild($x.CreateTextNode($env:NOTIFY_TITLE))
-[void]$t.Item(1).AppendChild($x.CreateTextNode($env:NOTIFY_TEXT))
-$app = '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe'
-[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($app).Show([Windows.UI.Notifications.ToastNotification]::new($x))
-"""
-
-
-def desktop_notify(title: str, text: str) -> None:
-    """Best effort: a Windows toast (tested), macOS notification or Linux notify-send (untested)."""
-    env = os.environ | {"NOTIFY_TITLE": title, "NOTIFY_TEXT": text}
-    if sys.platform == "win32":
-        cmd = ["powershell.exe", "-NoProfile", "-Command", TOAST_PS]  # Windows PowerShell 5.1: WinRT types load there
-    elif sys.platform == "darwin":
-        cmd = ["osascript", "-e", 'display notification (system attribute "NOTIFY_TEXT") '
-                                  'with title (system attribute "NOTIFY_TITLE")']
-    elif shutil.which("notify-send"):
-        cmd = ["notify-send", title, text]
-    else:
-        return
-    try:
-        p = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=30)
-        if p.returncode:
-            log(f"desktop notification failed: {(p.stderr or p.stdout).strip()[:200]}")
-    except Exception as e:
-        log(f"desktop notification failed: {e}")
-
-
-def alert(cfg: dict, text: str) -> None:
-    """A problem only the user can fix: phone ping if set up, and a desktop notification either way."""
-    ping(cfg, text)
-    desktop_notify(f"{app.APP_NAME} needs you", text)
-
-
 def sh(cmd: list[str], cwd, env=None) -> tuple[int, str]:
     log("$ " + " ".join(str(c) for c in cmd))
     p = subprocess.run([str(c) for c in cmd], cwd=cwd, capture_output=True, text=True,
@@ -169,7 +131,7 @@ def main(argv: list[str] | None = None) -> int:
         if problems:
             for p in problems:
                 log(f"pre-flight: {p}")
-            alert(cfg, f"Bookmark import stopped before fetching: {'; '.join(problems)}. To fix it, run "
+            ping(cfg, f"Bookmark import stopped before fetching: {'; '.join(problems)}. To fix it, run "
                        f"{app.setup_command()} in {app.REPO}; setup finds what's broken and asks only about that. "
                        "Nothing was lost: the next run picks up where this one would have.")
             return 2
@@ -182,7 +144,7 @@ def main(argv: list[str] | None = None) -> int:
             code, out = sh([cfg["tools"]["node"], "src/cli.js", "fetch", "1000", "--limit", str(batch)],
                            app.REPO / "smaug", env=smaug_env(cfg))
             if code != 0:
-                alert(cfg, "Bookmark import failed while fetching from X. The newest log in the data folder has details.")
+                ping(cfg, "Bookmark import failed while fetching from X. The newest log in the data folder has details.")
                 return 3
             m = re.search(r"Limiting to \d+ of (\d+) unprocessed", out)
             remaining = int(m.group(1)) - batch if m else 0
