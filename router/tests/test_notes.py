@@ -114,14 +114,28 @@ def _render(b, vitals=None):
     return render(b, {"primary": "ai", "topics": {"ai": 0.9}}, note, 10, vitals)
 
 
-def test_front_matter_carries_the_first_repos_vital_signs():
+def test_a_note_about_one_repo_carries_its_vital_signs():
     import yaml
-    b = _repo_bookmark("https://github.com/a/tool", "https://github.com/b/other")
-    text = _render(b, {"a/tool": V, "b/other": V | {"repo": "b/other", "stars": 3, "archived": True}})
+    text = _render(_repo_bookmark("https://github.com/a/tool"), {"a/tool": V})
     fm = yaml.safe_load(text.split("---")[1])
     assert fm["repo"] == "a/tool" and fm["repo_stars"] == 949 and fm["repo_archived"] is False
     assert str(fm["repo_pushed"]) == "2026-02-03" and str(fm["repo_checked"]) == "2026-10-08"
     assert "repo_last_release" not in fm  # no releases: no key, not an empty one
+    assert "- [a/tool](https://github.com/a/tool) · 949 stars · pushed 2026-02-03\n" in text
+
+
+def test_one_owners_repos_are_one_project_named_by_the_first():
+    import yaml
+    b = _repo_bookmark("https://github.com/Paper/stereos", "https://github.com/paper/agentd")
+    text = _render(b, {"Paper/stereos": V | {"repo": "Paper/stereos"}, "paper/agentd": V | {"repo": "paper/agentd"}})
+    assert yaml.safe_load(text.split("---")[1])["repo"] == "Paper/stereos"
+
+
+def test_a_note_listing_repos_is_about_none_of_them():
+    import yaml
+    b = _repo_bookmark("https://github.com/a/tool", "https://github.com/b/other")
+    text = _render(b, {"a/tool": V, "b/other": V | {"repo": "b/other", "stars": 3, "archived": True}})
+    assert not [k for k in yaml.safe_load(text.split("---")[1]) if k.startswith("repo")]
     assert "- [a/tool](https://github.com/a/tool) · 949 stars · pushed 2026-02-03\n" in text
     assert "- [b/other](https://github.com/b/other) · 3 stars · pushed 2026-02-03 · archived\n" in text
 
@@ -153,6 +167,22 @@ def test_repo_vitals_backfill_is_idempotent(tmp_path, monkeypatch):
     assert yaml.safe_load(once.split("---")[1])["repo"] == "a/tool"
     assert "- [a/tool](https://github.com/a/tool) · 949 stars · pushed 2026-02-03\n- [Piece]" in once
     assert once.endswith("> - [x](https://github.com/z/z)\n")  # the full-text callout is left alone
+
+
+def test_repo_vitals_backfill_annotates_a_repo_list_without_front_matter(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from jev_router import github, notes
+    looked = []
+    monkeypatch.setattr(github, "vitals", lambda n: looked.append(n) or V | {"repo": n})
+    note = tmp_path / "n.md"
+    note.write_text('---\ntweet_id: "1"\n---\n\n# N\n\n## Links\n\n- [a](https://github.com/a/tool)\n'
+                    '- [b](https://github.com/b/other)\n', encoding="utf-8")
+    args = SimpleNamespace(notes=[str(tmp_path)], apply=True, show=0)
+    notes.cmd_repo_vitals(args)
+    once = note.read_text(encoding="utf-8")
+    assert once.startswith('---\ntweet_id: "1"\n---\n') and "· 949 stars" in once.split("## Links")[1]
+    notes.cmd_repo_vitals(args)  # annotated lines mark it done: no second lookup, no change
+    assert note.read_text(encoding="utf-8") == once and len(looked) == 2
 
 
 @pytest.mark.parametrize("code,remaining,raises", [(404, "59", False), (403, "0", True), (429, None, True), (500, "50", False)])

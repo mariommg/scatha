@@ -81,7 +81,7 @@ On Windows the secrets are user environment variables: `TWITTER_AUTH_TOKEN`, `TW
 
 Each note's front matter carries `source`, `tweet_id`, `author`, `posted`, `captured`, `bucket`, `bucket_score`, `tags`, and `words`, so Obsidian's Properties and Bases can sort and filter them.
 
-A note that links a GitHub repo also carries that repo's vital signs: `repo`, `repo_stars`, `repo_pushed`, `repo_archived`, `repo_last_release` (when it has releases), and `repo_checked`, the date they were true. With several repos, the first one goes in the front matter and each repo's line under Links shows its own stars and last push. Old notes can catch up with `uv run --project router python -m jev_router.notes repo-vitals --notes <folder> ... [--apply]` (dry run without `--apply`; safe to repeat). GitHub allows 60 lookups an hour without a token, two per repo; set `GITHUB_TOKEN` for more.
+A note that links a GitHub repo also carries that repo's vital signs: `repo`, `repo_stars`, `repo_pushed`, `repo_archived`, `repo_last_release` (when it has releases), and `repo_checked`, the date they were true. Each repo's line under Links shows its own stars and last push. The front matter gets them only when the linked repos share one owner (one project, maybe in parts; the first repo stands for it); a list of repos from several owners isn't about any one of them, so it gets none. Old notes can catch up with `uv run --project router python -m jev_router.notes repo-vitals --notes <folder> ... [--apply]` (dry run without `--apply`; safe to repeat). GitHub allows 60 lookups an hour without a token, two per repo; set `GITHUB_TOKEN` for more.
 
 ## 5. Tuning your topics
 

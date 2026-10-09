@@ -304,8 +304,16 @@ def repos_in(b: dict) -> list[str]:
     return list(dict.fromkeys(filter(None, (github.repo_of(l["url"]) for l in _linked(b)))))
 
 
+def the_repo(names: list[str], vitals: dict) -> dict | None:
+    """The vital signs for the front matter: only when every linked repo has one owner (one project,
+    perhaps in parts), and then the first repo's. A list of repos from several owners isn't about any
+    one of them; their signs go on their own lines under Links."""
+    owners = {n.split("/")[0].lower() for n in names}
+    return vitals.get(names[0]) if len(owners) == 1 else None
+
+
 def render(b: dict, r: dict, note: dict, words: int, vitals: dict | None = None) -> str:
-    """vitals: repo vital signs by 'owner/repo' (github.vitals); the first linked repo's go in the front matter."""
+    """vitals: repo vital signs by 'owner/repo' (github.vitals)."""
     vitals = vitals or {}
     created = dt.datetime.strptime(b["createdAt"], "%a %b %d %H:%M:%S %z %Y").date().isoformat() if b.get("createdAt") else ""
     tags = list(dict.fromkeys(note["tags"]))
@@ -331,9 +339,9 @@ def render(b: dict, r: dict, note: dict, words: int, vitals: dict | None = None)
         "tags: [" + ", ".join(tags) + "]",
         f"words: {words}",
     ]
-    first = next((vitals[n] for n in repos_in(b) if n in vitals), None)
-    if first:
-        fm += github.front_matter(first)
+    only = the_repo(repos_in(b), vitals)
+    if only:
+        fm += github.front_matter(only)
     fm.append("---")
     body = [f"# {note['title']}", "", f"> {note['summary']}", ""]
     label = {"post": "the post", "images": "the post's images (transcribed)", "linked": "the linked piece"}
@@ -548,7 +556,7 @@ def cmd_backfill(args) -> None:
         print(f"  {f}")
 
 
-LINK_RE = re.compile(r"^- \[[^\]]*\]\((https?://[^)\s]+)\)")
+LINK_RE = re.compile(r"^- \[[^\]]*\]\((https?://[^)\s]+)\)(.*)$")  # group 2: ' · stars...' once annotated
 
 
 def links_section(text: str) -> tuple[str, str, str]:
@@ -561,28 +569,31 @@ def links_section(text: str) -> tuple[str, str, str]:
     return head + sep, rest[:cut], rest[cut:]
 
 
-def linked_repos(section: str) -> list[str]:
+def linked_repos(section: str, unannotated: bool = False) -> list[str]:
     names = []
     for line in section.split("\n"):
         m = LINK_RE.match(line)
         repo = github.repo_of(m.group(1)) if m else None
-        if repo:
+        if repo and not (unannotated and m.group(2).startswith(" · ")):
             names.append(repo)
     return list(dict.fromkeys(names))
 
 
 def add_vitals(text: str, vitals: dict) -> str:
-    """Front matter keys (first repo) and annotated repo lines under Links, for a note written before vital signs."""
+    """Annotated repo lines under Links, and front matter keys if the note links just one repo,
+    for a note written before vital signs."""
     head, section, tail = links_section(text)
-    first = next((vitals[n] for n in linked_repos(section) if n in vitals), None)
-    if first is None:
+    names = linked_repos(section)
+    if not any(n in vitals for n in names):
         return text
     lines = []
     for line in section.split("\n"):
         m = LINK_RE.match(line)
         lines.append(link_line(m.group(1), None, vitals) if m and github.repo_of(m.group(1)) else line)
-    end = head.index("\n---", 3)
-    head = head[:end] + "\n" + "\n".join(github.front_matter(first)) + head[end:]
+    only = the_repo(names, vitals)
+    if only:
+        end = head.index("\n---", 3)
+        head = head[:end] + "\n" + "\n".join(github.front_matter(only)) + head[end:]
     return head + "\n".join(lines) + tail
 
 
@@ -594,7 +605,7 @@ def cmd_repo_vitals(args) -> None:
             text = f.read_text(encoding="utf-8")
             if not re.search(r'^tweet_id: "', text, re.M) or re.search(r"^repo_checked:", text, re.M):
                 continue
-            names = linked_repos(links_section(text)[1])
+            names = linked_repos(links_section(text)[1], unannotated=True)
             if names:
                 todo[f] = (text, names)
     cache: dict = {}
