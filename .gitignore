@@ -19,3 +19,4 @@ __pycache__/
 
 # Session handoff (personal paths and history)
 HANDOFF.md
+RETEST-HOWTO.md
