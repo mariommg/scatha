@@ -26,7 +26,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from . import Taxonomy
+from . import Taxonomy, github
 
 CLAUDE_FLAGS = [
     "-p", "--model", "haiku", "--tools", "", "--strict-mcp-config",
@@ -299,7 +299,14 @@ def _yaml_str(s: str) -> str:
     return json.dumps(s, ensure_ascii=False)
 
 
-def render(b: dict, r: dict, note: dict, words: int) -> str:
+def repos_in(b: dict) -> list[str]:
+    """'owner/repo' for each GitHub repo the bookmark links to, in link order."""
+    return list(dict.fromkeys(filter(None, (github.repo_of(l["url"]) for l in _linked(b)))))
+
+
+def render(b: dict, r: dict, note: dict, words: int, vitals: dict | None = None) -> str:
+    """vitals: repo vital signs by 'owner/repo' (github.vitals); the first linked repo's go in the front matter."""
+    vitals = vitals or {}
     created = dt.datetime.strptime(b["createdAt"], "%a %b %d %H:%M:%S %z %Y").date().isoformat() if b.get("createdAt") else ""
     tags = list(dict.fromkeys(note["tags"]))
     if words >= LONG_READ_WORDS:
@@ -323,8 +330,11 @@ def render(b: dict, r: dict, note: dict, words: int) -> str:
         f"bucket_score: {r['topics'][r['primary']]:.2f}",
         "tags: [" + ", ".join(tags) + "]",
         f"words: {words}",
-        "---",
     ]
+    first = next((vitals[n] for n in repos_in(b) if n in vitals), None)
+    if first:
+        fm += github.front_matter(first)
+    fm.append("---")
     body = [f"# {note['title']}", "", f"> {note['summary']}", ""]
     label = {"post": "the post", "images": "the post's images (transcribed)", "linked": "the linked piece"}
     for q in note.get("pull_quotes") or []:
@@ -353,7 +363,7 @@ def render(b: dict, r: dict, note: dict, words: int) -> str:
     body += ["", f"[@{b['author']} on X]({b['tweetUrl']})"]
     if links:
         body += ["", "## Links", ""]
-        body += [f"- [{_slug_title(l['title']) if l.get('title') else l['url']}]({l['url']})" for l in links]
+        body += [link_line(l["url"], l.get("title"), vitals) for l in links]
     extra = full_text(b)
     if extra:
         body += [""] + extra
@@ -367,6 +377,27 @@ FULL_TEXT = "> [!abstract]- Full text"
 
 def _quoted(text: str) -> list[str]:
     return [f"> {line}" if line.strip() else ">" for line in text.strip().splitlines()]
+
+
+def link_line(url: str, title: str | None, vitals: dict) -> str:
+    """A Links bullet. A repo is titled owner/repo (slugging ate the slash) and carries its vital signs."""
+    repo = github.repo_of(url)
+    if repo:
+        return f"- [{repo}]({url})" + (github.inline(vitals[repo]) if repo in vitals else "")
+    return f"- [{_slug_title(title) if title else url}]({url})"
+
+
+def lookup_vitals(names, cache: dict) -> None:
+    """Fill cache with vital signs for names not yet in it. Stops quietly at GitHub's rate limit."""
+    for n in names:
+        if n in cache:
+            continue
+        try:
+            cache[n] = github.vitals(n)
+        except github.RateLimited:
+            print("  GitHub rate limit reached; remaining notes go out without repo vital signs (set GITHUB_TOKEN to raise it)")
+            cache.update({m: None for m in names if m not in cache})
+            return
 
 
 def full_text(b: dict) -> list[str]:
@@ -458,7 +489,7 @@ def cmd_write(args) -> dict:
             print(f"  dropped a quote not found verbatim in {q.get('from')} (@{b['author']}): {q.get('quote', '')!r}")
         return r, b, note, words, usage
 
-    tokens, written, failed = 0, [], []
+    tokens, written, failed, repo_cache = 0, [], [], {}
     with ThreadPoolExecutor(max_workers=4) as pool:
         for r, b, note, words, usage in pool.map(one, todo):
             if note is None:
@@ -471,7 +502,9 @@ def cmd_write(args) -> dict:
             path = folder / f"{name}.md"
             if path.exists():
                 path = folder / f"{name} (@{b['author']}).md"
-            path.write_text(render(b, r, note, words), encoding="utf-8")
+            lookup_vitals(repos_in(b), repo_cache)
+            vitals = {n: v for n, v in repo_cache.items() if v}
+            path.write_text(render(b, r, note, words, vitals), encoding="utf-8")
             tokens += (usage.get("input_tokens") or 0) + (usage.get("output_tokens") or 0)
             written.append((r["item_id"], r["primary"], str(path)))
             print(f"  {r['primary']:17} {path.name}")
@@ -515,6 +548,74 @@ def cmd_backfill(args) -> None:
         print(f"  {f}")
 
 
+LINK_RE = re.compile(r"^- \[[^\]]*\]\((https?://[^)\s]+)\)")
+
+
+def links_section(text: str) -> tuple[str, str, str]:
+    """(before, the lines under '## Links', after): the section ends at the next heading or callout."""
+    head, sep, rest = text.partition("\n## Links\n")
+    if not sep:
+        return text, "", ""
+    ends = [i for i in (rest.find("\n## "), rest.find("\n> [!")) if i >= 0]
+    cut = min(ends) if ends else len(rest)
+    return head + sep, rest[:cut], rest[cut:]
+
+
+def linked_repos(section: str) -> list[str]:
+    names = []
+    for line in section.split("\n"):
+        m = LINK_RE.match(line)
+        repo = github.repo_of(m.group(1)) if m else None
+        if repo:
+            names.append(repo)
+    return list(dict.fromkeys(names))
+
+
+def add_vitals(text: str, vitals: dict) -> str:
+    """Front matter keys (first repo) and annotated repo lines under Links, for a note written before vital signs."""
+    head, section, tail = links_section(text)
+    first = next((vitals[n] for n in linked_repos(section) if n in vitals), None)
+    if first is None:
+        return text
+    lines = []
+    for line in section.split("\n"):
+        m = LINK_RE.match(line)
+        lines.append(link_line(m.group(1), None, vitals) if m and github.repo_of(m.group(1)) else line)
+    end = head.index("\n---", 3)
+    head = head[:end] + "\n" + "\n".join(github.front_matter(first)) + head[end:]
+    return head + "\n".join(lines) + tail
+
+
+def cmd_repo_vitals(args) -> None:
+    """Add repo vital signs to notes written before they existed. No LLM; GitHub API only; idempotent."""
+    todo = {}
+    for folder in args.notes:
+        for f in sorted(Path(folder).rglob("*.md")):
+            text = f.read_text(encoding="utf-8")
+            if not re.search(r'^tweet_id: "', text, re.M) or re.search(r"^repo_checked:", text, re.M):
+                continue
+            names = linked_repos(links_section(text)[1])
+            if names:
+                todo[f] = (text, names)
+    cache: dict = {}
+    lookup_vitals(list(dict.fromkeys(n for _, ns in todo.values() for n in ns)), cache)
+    vitals = {n: v for n, v in cache.items() if v}
+    changed, left = [], 0
+    for f, (text, names) in todo.items():
+        new = add_vitals(text, vitals)
+        if new == text:
+            left += 1
+            continue
+        changed.append(f)
+        if args.apply:
+            f.write_text(new, encoding="utf-8")
+    verb = "added to" if args.apply else "would be added to (dry run; pass --apply)"
+    print(f"repo vital signs {verb} {len(changed)} notes; {left} link repos GitHub couldn't describe this time; "
+          f"{len(vitals)} of {len(cache)} repos looked up")
+    for f in changed[:args.show]:
+        print(f"  {f}")
+
+
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # Windows consoles default to cp1252
     ap = argparse.ArgumentParser()
@@ -534,8 +635,13 @@ def main() -> None:
     f.add_argument("--ids", nargs="*")
     f.add_argument("--apply", action="store_true")
     f.add_argument("--show", type=int, default=5)
+    v = sub.add_parser("repo-vitals")
+    v.add_argument("--notes", nargs="+", required=True)
+    v.add_argument("--apply", action="store_true")
+    v.add_argument("--show", type=int, default=5)
     args = ap.parse_args()
-    {"describe": cmd_describe, "write": cmd_write, "backfill": cmd_backfill}[args.cmd](args)
+    {"describe": cmd_describe, "write": cmd_write, "backfill": cmd_backfill,
+     "repo-vitals": cmd_repo_vitals}[args.cmd](args)
 
 
 if __name__ == "__main__":
