@@ -111,7 +111,7 @@ function birdInstalled(config) {
 }
 
 export function createX({ builtin = builtinBackend, bird = birdBackend, hasBird = birdInstalled, log = console.log } = {}) {
-  const counts = { builtin: 0, fallback: 0, bird: 0 };
+  const counts = { builtin: 0, fallback: 0, fallbackFailed: 0, bird: 0 };
 
   async function call(op, config, ...args) {
     const mode = (process.env.SMAUG_X_CLIENT || 'auto').toLowerCase();
@@ -127,9 +127,13 @@ export function createX({ builtin = builtinBackend, bird = birdBackend, hasBird 
     } catch (error) {
       if (mode === 'builtin' || !hasBird(config)) throw error;
       log(`  X: built-in client failed on ${op} (${error.message}); falling back to bird`);
-      const out = await bird[op](config, ...args);
       counts.fallback++;
-      return out;
+      try {
+        return await bird[op](config, ...args);
+      } catch (birdError) {
+        counts.fallbackFailed++;
+        throw birdError;
+      }
     }
   }
 
@@ -138,6 +142,7 @@ export function createX({ builtin = builtinBackend, bird = birdBackend, hasBird 
     x[op] = (config, ...args) => call(op, config, ...args);
   }
   x.summary = () => `X client: ${counts.builtin} built-in, ${counts.fallback} bird fallbacks`
+    + (counts.fallbackFailed ? ` (${counts.fallbackFailed} failed there too)` : '')
     + (counts.bird ? `, ${counts.bird} through bird (forced)` : '');
   return x;
 }

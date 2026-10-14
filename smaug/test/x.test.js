@@ -39,16 +39,24 @@ describe('X client fallback', () => {
   test('uses the built-in client when it works', async () => {
     const x = createX({ builtin: working, bird, hasBird: () => true, log: quiet });
     assert.strictEqual((await x.tweet(config, '1')).via, 'builtin');
-    assert.deepStrictEqual(x.counts, { builtin: 1, fallback: 0, bird: 0 });
+    assert.deepStrictEqual(x.counts, { builtin: 1, fallback: 0, fallbackFailed: 0, bird: 0 });
   });
 
   test('retries a failed call through bird and counts it', async () => {
     const logged = [];
     const x = createX({ builtin: failing, bird, hasBird: () => true, log: m => logged.push(m) });
     assert.strictEqual((await x.tweet(config, '1')).via, 'bird');
-    assert.deepStrictEqual(x.counts, { builtin: 0, fallback: 1, bird: 0 });
+    assert.deepStrictEqual(x.counts, { builtin: 0, fallback: 1, fallbackFailed: 0, bird: 0 });
     assert.match(logged[0], /falling back to bird/);
     assert.match(x.summary(), /0 built-in, 1 bird fallbacks/);
+  });
+
+  test('a fallback that fails in bird too is counted, not hidden', async () => {
+    // 2026-10-10: two deleted accounts failed both ways and the log still read "0 bird fallbacks"
+    const x = createX({ builtin: failing, bird: failing, hasBird: () => true, log: quiet });
+    await assert.rejects(x.tweet(config, '1'), /X changed something/);
+    assert.deepStrictEqual(x.counts, { builtin: 0, fallback: 1, fallbackFailed: 1, bird: 0 });
+    assert.match(x.summary(), /1 bird fallbacks \(1 failed there too\)/);
   });
 
   test('without bird, the built-in error surfaces', async () => {
@@ -66,6 +74,6 @@ describe('X client fallback', () => {
     process.env.SMAUG_X_CLIENT = 'bird';
     const x = createX({ builtin: working, bird, hasBird: () => true, log: quiet });
     assert.strictEqual((await x.tweet(config, '1')).via, 'bird');
-    assert.deepStrictEqual(x.counts, { builtin: 0, fallback: 0, bird: 1 });
+    assert.deepStrictEqual(x.counts, { builtin: 0, fallback: 0, fallbackFailed: 0, bird: 1 });
   });
 });

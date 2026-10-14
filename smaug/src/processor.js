@@ -672,6 +672,7 @@ export async function fetchAndPrepareBookmarks(options = {}) {
   console.log(`Preparing ${toProcess.length} tweets...`);
 
   const prepared = [];
+  const failed = [];
 
   for (const bookmark of toProcess) {
     try {
@@ -932,6 +933,7 @@ export async function fetchAndPrepareBookmarks(options = {}) {
 
     } catch (error) {
       console.error(`  Error processing bookmark ${bookmark.id}: ${error.message}`);
+      failed.push({ id: bookmark.id, error: error.message });
     }
   }
 
@@ -959,7 +961,10 @@ export async function fetchAndPrepareBookmarks(options = {}) {
   const output = {
     generatedAt: now.toISOString(),
     count: allBookmarks.length,
-    bookmarks: allBookmarks
+    bookmarks: allBookmarks,
+    // This fetch's failures, so the caller can report them. They aren't archived,
+    // so the next fetch picks them up again.
+    prepareFailed: failed
   };
 
   const pendingDir = path.dirname(config.pendingFile);
@@ -968,11 +973,12 @@ export async function fetchAndPrepareBookmarks(options = {}) {
   }
   fs.writeFileSync(config.pendingFile, JSON.stringify(output, null, 2));
   console.log(`\nMerged ${newBookmarks.length} new bookmarks into ${config.pendingFile} (total: ${output.count})`);
+  if (failed.length) console.log(`Could not prepare ${failed.length} of ${toProcess.length} bookmarks`);
   console.log(x.summary());
 
   // Update state
   state.last_check = now.toISOString();
   saveState(config, state);
 
-  return { bookmarks: prepared, count: prepared.length, pendingFile: config.pendingFile };
+  return { bookmarks: prepared, count: prepared.length, failed, pendingFile: config.pendingFile };
 }

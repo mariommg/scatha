@@ -148,12 +148,23 @@ def main(argv: list[str] | None = None) -> int:
                 return 3
             m = re.search(r"Limiting to \d+ of (\d+) unprocessed", out)
             remaining = int(m.group(1)) - batch if m else 0
-        if not pending.exists() or not json.loads(pending.read_text(encoding="utf-8")).get("bookmarks"):
+        batch_file = json.loads(pending.read_text(encoding="utf-8")) if pending.exists() else {}
+        # Bookmarks Smaug couldn't read stay out of the ledger, so the next fetch brings them back
+        unread = batch_file.get("prepareFailed") or []
+        for f in unread:
+            log(f"could not read bookmark {f.get('id')}: {f.get('error')}")
+        if not batch_file.get("bookmarks"):
+            if unread:
+                run_dir.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(pending), run_dir / "pending-bookmarks.json")
+                ping(cfg, f"Bookmark import: {len(unread)} new bookmarks couldn't be read and will retry next run. "
+                          "The newest log in the data folder has details.")
+                return 1
             ping(cfg, "Bookmark import: no new bookmarks this time.")
             last_ok.touch()
             return 0
-        bookmarks = {str(b["id"]): b for b in json.loads(pending.read_text(encoding="utf-8"))["bookmarks"]}
-        log(f"{len(bookmarks)} bookmarks to process")
+        bookmarks = {str(b["id"]): b for b in batch_file["bookmarks"]}
+        log(f"{len(bookmarks)} bookmarks to process" + (f" ({len(unread)} couldn't be read)" if unread else ""))
 
         # 3. Images -> text, 4. route, 5. notes
         notes.cmd_describe(argparse.Namespace(pending=str(pending)))
@@ -174,7 +185,7 @@ def main(argv: list[str] | None = None) -> int:
 
         # 7. Summary
         labels = {t.key: t.label or t.key.replace("_", " ") for t in tax.topics}
-        failed = len(summary["failed"]) + sum(r.status == "error" for r in results)
+        failed = len(summary["failed"]) + sum(r.status == "error" for r in results) + len(unread)
         ping(cfg, summary_text(summary["written"], sum(r.status == "skip" for r in results), failed, remaining, labels))
         log(f"note-writer tokens this run: {summary['tokens']:,}")
         return 1 if failed else 0

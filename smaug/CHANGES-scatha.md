@@ -35,9 +35,15 @@ used; the router in `../router` sorts and writes notes instead.
   `vendor/bird/` and called in-process through `src/x.js`, which returns the same JSON
   the bird CLI printed. If a call fails and the bird CLI is installed, that call is
   retried through it (`src/x-bird.js`, the old shell-out code). `SMAUG_X_CLIENT=builtin|bird`
-  forces one path; each fetch ends with a count of built-in calls and fallbacks.
+  forces one path; each fetch ends with a count of built-in calls and fallbacks,
+  including fallbacks that failed in bird too.
   `fetchBookmarks`, `fetchTweet`, `fetchSelfThread`, `fetchMentionBios`, `fetchLikes`,
   `fetchFromSource`, and `fetchFromFolders` are now async. New `whoami` command;
   `setup` no longer requires bird.
+- **Failed bookmarks are reported.** A bookmark that throws while being prepared used
+  to be logged and dropped from the batch. The pending file now lists them under
+  `prepareFailed` (`{id, error}`, this fetch only) and `fetchAndPrepareBookmarks`
+  returns them as `failed`, so a caller can tell a partial or failed batch from an
+  empty one. They are not archived, so the next fetch picks them up again.
 - **Sample data removed.** The upstream author's own `bookmarks.md` and `knowledge/`
   examples are not included.
