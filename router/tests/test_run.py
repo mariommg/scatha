@@ -5,6 +5,7 @@ fetch brings it back) and shows up in the run's summary and exit code; a run whe
 nothing could be read is a failure, not "no new bookmarks".
 """
 
+import collections
 import json
 from types import SimpleNamespace
 
@@ -24,10 +25,14 @@ def fake(tmp_path, monkeypatch):
     app.save_config({"tools": {"node": "node", "bird": "bird", "claude": "claude"}})
     topics.write_taxonomy([{"label": "AI", **{k: topics.PRESETS["AI"][k] for k in ("question", "yes_means", "no_means")},
                             "destination": str(tmp_path / "vault")}], tmp_path / "topics.yaml")
-    f = SimpleNamespace(prepared=[], failed_prep=[], note_fails=set(), pings=[], home=tmp_path)
+    f = SimpleNamespace(prepared=[], failed_prep=[], note_fails=set(), pings=[], home=tmp_path,
+                        vault=collections.Counter(), fetches=0)  # vault: note id -> times written
 
     def smaug(cmd, cwd, env=None):  # what `node src/cli.js fetch` leaves behind
-        out = {"bookmarks": f.prepared, "prepareFailed": [{"id": i, "error": "boom"} for i in f.failed_prep]}
+        f.fetches += 1
+        done = ledger(f)  # like Smaug, skip anything the ledger already lists
+        out = {"bookmarks": [b for b in f.prepared if b["tweetUrl"] + " " not in done],
+               "prepareFailed": [{"id": i, "error": "boom"} for i in f.failed_prep]}
         (app.work() / "pending-bookmarks.json").write_text(json.dumps(out), encoding="utf-8")
         return 0, ""
 
@@ -36,10 +41,13 @@ def fake(tmp_path, monkeypatch):
         ids = [b["id"] for b in json.loads(pending.read_text(encoding="utf-8"))["bookmarks"]]
         return [SimpleNamespace(item_id=i, status="route", primary="ai") for i in ids]
 
-    def write(args):
+    def write(args):  # like notes.cmd_write: a note already in the vault is "present", not written again
         ids = [b["id"] for b in json.loads(open(args.pending, encoding="utf-8").read())["bookmarks"]]
-        return {"written": [(i, "ai", f"{i}.md") for i in ids if i not in f.note_fails],
-                "present": [], "failed": [i for i in ids if i in f.note_fails], "tokens": 0}
+        present = [i for i in ids if f.vault[i]]
+        new = [i for i in ids if not f.vault[i] and i not in f.note_fails]
+        f.vault.update(new)
+        return {"written": [(i, "ai", f"{i}.md") for i in new], "present": present,
+                "failed": [i for i in ids if i in f.note_fails], "tokens": 0}
 
     monkeypatch.setattr(app, "load_secrets", lambda: None)
     monkeypatch.setattr(checks, "preflight", lambda cfg: [])
@@ -147,3 +155,41 @@ def test_a_locked_run_exits_without_fetching(fake):
     assert run.main([]) == 0
     assert ledger(fake) == "" and not fake.pings  # nothing fetched, nothing reported
     assert (fake.home / "work" / ".run.lock").read_text(encoding="utf-8") == held  # and the holder's lock survives
+
+
+# ----- a run that dies halfway: the next one finishes the job, no duplicates, nothing lost -----
+
+def crash_once(monkeypatch, target, name):
+    real, state = getattr(target, name), {"crashed": False}
+
+    def once(*a, **k):
+        if not state["crashed"]:
+            state["crashed"] = True
+            raise RuntimeError("power cut")
+        return real(*a, **k)
+    monkeypatch.setattr(target, name, once)
+
+
+def test_a_run_that_dies_after_fetching_is_finished_by_the_next(fake, monkeypatch):
+    fake.prepared = [bookmark(1), bookmark(2)]
+    crash_once(monkeypatch, run, "route_file")
+    with pytest.raises(RuntimeError):
+        run.main([])
+    assert not (fake.home / "work" / ".run.lock").exists()  # the lock doesn't outlive the crash
+    fake.prepared = []  # X has nothing newer; the batch must come from the saved pending file
+    assert run.main([]) == 0
+    assert fake.fetches == 1  # resumed, not refetched
+    assert ledger(fake).count("status/1 ") == 1 and ledger(fake).count("status/2 ") == 1
+
+
+def test_a_run_that_dies_after_writing_notes_does_not_write_them_twice(fake, monkeypatch):
+    fake.prepared = [bookmark(1), bookmark(2)]
+    crash_once(monkeypatch, run, "append_ledger")  # notes are in the vault; the ledger never heard
+    with pytest.raises(RuntimeError):
+        run.main([])
+    assert ledger(fake) == ""
+    assert run.main([]) == 0
+    assert dict(fake.vault) == {"1": 1, "2": 1}  # each note written once
+    assert ledger(fake).count("status/1 ") == 1 and ledger(fake).count("status/2 ") == 1
+    assert run.main([]) == 0 and fake.fetches == 2  # a third run fetches fresh and finds nothing new
+    assert ledger(fake).count("status/1 ") == 1
