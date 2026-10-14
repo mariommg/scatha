@@ -5,6 +5,7 @@ run-weekly.ps1
 my-setup.json
 *.env
 .smaug-upstream.git/
+.smaug-fork/
 
 # Vendored Smaug: its own runtime files
 smaug/smaug.config.json
