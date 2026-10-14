@@ -18,6 +18,7 @@ import timezone from 'dayjs/plugin/timezone.js';
 import { Readability } from '@mozilla/readability';
 import { parseHTML } from 'linkedom';
 import { loadConfig } from './config.js';
+import { safeFetch } from './safe-fetch.js';
 import { x } from './x.js';
 
 dayjs.extend(utc);
@@ -157,12 +158,11 @@ export async function fetchXArticleContent(articleUrl, config, sourceTweetId = n
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 15000);
     
-    const response = await fetch(articleUrl, {
+    const response = await safeFetch(articleUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
       },
-      signal: controller.signal,
-      redirect: 'follow'
+      signal: controller.signal
     });
     clearTimeout(timeout);
     
@@ -433,9 +433,8 @@ export async function expandTcoLink(url, timeout = 10000) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-    const response = await fetch(url, {
+    const response = await safeFetch(url, {
       method: 'HEAD',
-      redirect: 'follow',
       signal: controller.signal
     });
     clearTimeout(timeoutId);
@@ -545,10 +544,9 @@ async function fetchHtml(url) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
   try {
-    const response = await fetch(url, {
+    const response = await safeFetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
-      signal: controller.signal,
-      redirect: 'follow'
+      signal: controller.signal
     });
     return (await response.text()).slice(0, 2_000_000);
   } finally {

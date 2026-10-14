@@ -45,5 +45,12 @@ used; the router in `../router` sorts and writes notes instead.
   `prepareFailed` (`{id, error}`, this fetch only) and `fetchAndPrepareBookmarks`
   returns them as `failed`, so a caller can tell a partial or failed batch from an
   empty one. They are not archived, so the next fetch picks them up again.
+- **Links can't reach this machine's network.** Bookmarked links, and every redirect
+  they lead through, go through `src/safe-fetch.js`: web addresses only, and a host
+  that resolves to loopback, private, link-local (incl. 169.254.169.254), or another
+  non-public range is refused before any request is sent. Redirects are followed one
+  hop at a time (5 at most). Used by t.co expansion, article fetches, and the X article
+  page fallback; a refused link only loses that link's content. Known gap: DNS
+  rebinding (the name is looked up again when fetch connects). No new dependencies.
 - **Sample data removed.** The upstream author's own `bookmarks.md` and `knowledge/`
   examples are not included.
