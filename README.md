@@ -64,7 +64,7 @@ What leaves your computer: your X session talks to X (it's your login, used the 
 
 - **X can change under us.** Smaug reads X with a copy of the client code from [bird](https://www.npmjs.com/package/@steipete/bird), kept in `smaug/vendor/bird/`. bird's author has stopped maintaining it, so when X changes its internals, the fix lands here, not upstream. If you also install bird 0.8.0, it's tried as a backup whenever the built-in client fails.
 - **This uses your X session cookies** for automated reading, which X's terms don't love. It only reads your own bookmarks, at a modest pace, but it's your account and your call.
-- **Windows is the tested path.** The macOS (launchd) and Linux (systemd) schedulers are written to spec and haven't had their first real run yet. If you're the first, tell me how it went.
+- **Windows is the tested path.** The macOS (launchd) and Linux (systemd) schedulers are written to spec and haven't had their first real run yet. If you're the first, tell me how it went. On a Linux server, run `loginctl enable-linger $USER` once, or the schedule stops when you log out; [the runbook](docs/RUNBOOK.md#on-a-server-with-no-screen-linux-over-ssh) covers the rest of a no-screen install.
 - **Video is invisible.** A post whose substance is a video gets a short, honest note that says so, plus the link.
 - **Sorting is good, not perfect.** On my reviewed sample, Jev's call matched mine 14 times out of 15. Your topics, your wording, your mileage.
 

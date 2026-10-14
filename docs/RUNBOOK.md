@@ -22,7 +22,19 @@ Everything you might need after setup, roughly in the order you'll need it. The 
 4. Optional: open `docs/onboarding.html`, plan your topics and schedule, and download `my-setup.json`.
 5. Run `setup` (add `--answers path/to/my-setup.json` if you made one).
 
-The wizard runs seven steps: tools, X login, Jev, Haiku, topics and folders, schedule, and a test drive. Each secret is typed into a hidden prompt and checked against the real service before it's stored. Run `setup` again any time. It checks every step (the logins live, which takes a few seconds), shows what's already set, and goes straight to whatever is missing or broken: a setup you stopped partway resumes where you left off, and an expired login gets fixed without redoing the rest. If everything works, it offers to change any one step. The test drive runs the scheduled script itself, in a fresh shell, so it proves what the scheduler will see.
+The wizard runs seven steps: tools, X login, Jev, Haiku, topics and folders, schedule, and a test drive. Each secret is typed into a hidden prompt and checked against the real service before it's stored. Run `setup` again any time. It checks every step (the logins live, which takes a few seconds), shows what's already set, and goes straight to whatever is missing or broken: a setup you stopped partway resumes where you left off, and an expired login gets fixed without redoing the rest. If everything works, it offers to change any one step. The test drive runs the scheduled script itself, in a fresh shell, so it proves what the scheduler will see. On Linux with systemd, it runs through systemd, so it gets the same bare PATH the timer will.
+
+### On a server with no screen (Linux over SSH)
+
+Everything above works over SSH. A few things go differently without a browser or a desktop session:
+
+- **Getting the code there.** `git clone` the repo, or copy the folder over (`scp -r`, or a `git bundle` file if the repo is private to you).
+- **Claude Code login.** Run `claude` once. With no browser, it prints a login link; open it on any other machine and paste back the code it gives you.
+- **X cookies.** Copy `auth_token` and `ct0` from a browser on any machine where you're logged in to X (the wizard says where to find them), then paste them into the wizard on the server.
+- **Folders.** There's probably no Obsidian on a server, so the wizard asks for a plain folder. Point it at a synced folder if you want the notes elsewhere.
+- **Keep the timer alive after you log out.** systemd stops a user's timers when their last session ends. Run `loginctl enable-linger $USER` once (some systems need `sudo`). The wizard reminds you if lingering is off.
+- **"Failed to connect to bus."** Some SSH logins don't get a systemd user session. Enabling lingering and logging in again usually fixes it; until then, setup prints a crontab line to add instead.
+- **Node from nvm.** The schedule doesn't load your shell profile, so a Node or Claude Code that only nvm knows about may not be found. The test drive will catch this; install Node system-wide, or tell me how it failed.
 
 ## 2. What a run does
 

@@ -438,6 +438,9 @@ def step_schedule(cfg: dict, preset: dict | None = None, batch: int | None = Non
         return False
     if sys.platform == "win32":
         hint("It runs while you're logged in (a locked screen is fine) and wakes the PC if it's asleep.")
+    elif sys.platform != "darwin" and scheduler.lingering() is False:
+        hint("It only runs while you're logged in. On a server, keep it running after you log out with:")
+        hint("  loginctl enable-linger $USER")
     return True
 
 

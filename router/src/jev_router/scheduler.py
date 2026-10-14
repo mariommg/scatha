@@ -5,7 +5,8 @@ so the scheduler needs no environment of its own) and registers it:
 
     Windows  Task Scheduler task  (runs while you're logged in; wakes the PC; catches up if missed)
     macOS    launchd agent        ~/Library/LaunchAgents/
-    Linux    systemd user timer   ~/.config/systemd/user/  (crontab line printed if systemd isn't there)
+    Linux    systemd user timer   ~/.config/systemd/user/  (crontab line printed if systemd isn't
+                                  there, or this session can't reach it, as over a bare SSH login)
 
 Only the Windows path has run in anger so far; macOS and Linux are written to the
 platforms' documented formats and still need a first real install.
@@ -88,6 +89,27 @@ def write_wrapper(home: Path | None = None, repo: Path | None = None) -> Path:
 
 
 # ---------- per-OS registration ----------
+def _systemd() -> bool:
+    """A systemd user manager this session can reach. systemctl can be installed with no user
+    bus behind it (a plain SSH login), and then every 'systemctl --user' call fails."""
+    return bool(shutil.which("systemctl")) and subprocess.run(
+        ["systemctl", "--user", "show-environment"], capture_output=True).returncode == 0
+
+
+def lingering() -> bool | None:
+    """Does systemd keep this user's timers running after they log out? None if it can't be told."""
+    if not shutil.which("loginctl"):
+        return None
+    p = subprocess.run(["loginctl", "show-user", os.environ.get("USER", ""), "--property=Linger", "--value"],
+                       capture_output=True, text=True)
+    return {"yes": True, "no": False}.get(p.stdout.strip()) if p.returncode == 0 else None
+
+
+def _units(stem: str) -> list[Path]:
+    unit_dir = Path.home() / ".config/systemd/user"
+    return [unit_dir / f"{stem}.service", unit_dir / f"{stem}.timer"]
+
+
 
 def windows_ps(sched: dict, wrapper: Path, task: str | None = None) -> str:
     task = task or app.task_name()
@@ -170,15 +192,19 @@ def install(cfg: dict) -> str:
         subprocess.run(["launchctl", "bootout", f"gui/{uid}", str(plist)], capture_output=True)
         subprocess.run(["launchctl", "bootstrap", f"gui/{uid}", str(plist)], check=True)
         return f"launchd agent '{label}' runs {describe(sched)} (if the Mac is asleep, it runs on wake)."
-    if shutil.which("systemctl"):
-        unit_dir = Path.home() / ".config/systemd/user"
-        unit_dir.mkdir(parents=True, exist_ok=True)
+    if _systemd():
+        service_file, timer_file = _units(stem)
+        service_file.parent.mkdir(parents=True, exist_ok=True)
         service, timer = systemd_units(sched, wrapper)
-        (unit_dir / f"{stem}.service").write_text(service)
-        (unit_dir / f"{stem}.timer").write_text(timer)
+        service_file.write_text(service)
+        timer_file.write_text(timer)
         subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
         subprocess.run(["systemctl", "--user", "enable", "--now", f"{stem}.timer"], check=True)
         return f"systemd user timer '{stem}.timer' runs {describe(sched)} (catches up if the machine was off)."
+    if shutil.which("systemctl"):
+        return ("systemd is here, but this session can't reach your user manager (usual over SSH).\n"
+                "    Either run 'loginctl enable-linger $USER', log in again, and rerun setup's schedule step,\n"
+                "    or add this line with 'crontab -e':\n    " + cron_line(sched, wrapper))
     return ("No systemd here. Add this line with 'crontab -e':\n    " + cron_line(sched, wrapper))
 
 
@@ -189,15 +215,17 @@ def installed() -> bool | None:
         return subprocess.run(["schtasks", "/Query", "/TN", app.task_name()], capture_output=True).returncode == 0
     if sys.platform == "darwin":
         return (Path.home() / "Library/LaunchAgents" / f"com.{stem}.plist").exists()
-    if shutil.which("systemctl"):
-        return (Path.home() / ".config/systemd/user" / f"{stem}.timer").exists()
+    if _systemd():
+        return subprocess.run(["systemctl", "--user", "is-enabled", "--quiet", f"{stem}.timer"],
+                              capture_output=True).returncode == 0
     return None
 
 
 def scheduler_env() -> dict:
     """The environment a scheduled run starts with, as near as setup can tell: no venv from
-    'uv run', no secrets or settings setup loaded into its own process, and on Windows the
-    PATH rebuilt from the registry the way Task Scheduler builds it."""
+    'uv run', no secrets or settings setup loaded into its own process, and the PATH the
+    scheduler gives: on Windows rebuilt from the registry the way Task Scheduler builds it,
+    elsewhere the bare one launchd and cron start with (the wrapper adds its own dirs to it)."""
     drop = {"VIRTUAL_ENV", "CLAUDE_BIN", "NOTES_BACKEND", "READER_PROFILE", "AUTH_TOKEN", "CT0", *app.SECRETS.values()}
     env = {k: v for k, v in os.environ.items() if k not in drop}
     venv = os.environ.get("VIRTUAL_ENV")
@@ -216,15 +244,22 @@ def scheduler_env() -> dict:
             paths = os.pathsep.join(parts).split(os.pathsep)
         except OSError:
             pass
+    else:
+        paths = ["/usr/bin", "/bin", "/usr/sbin", "/sbin"] if sys.platform == "darwin" else ["/usr/bin", "/bin"]
     env["PATH"] = os.pathsep.join(p for p in paths if p)
     return env
 
 
 def run_now(args: list[str]) -> int:
-    """Run the scheduled script itself, in a fresh shell, the way the scheduler would."""
+    """Run the scheduled script itself, in a fresh shell, the way the scheduler would. Where a
+    systemd timer runs it, the run goes through systemd itself, so it gets the timer's PATH."""
     wrapper = write_wrapper()
-    cmd = (["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(wrapper), *args]
-           if sys.platform == "win32" else ["/bin/bash", str(wrapper), *args])
+    if sys.platform == "win32":
+        cmd = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(wrapper), *args]
+    elif sys.platform != "darwin" and _systemd() and shutil.which("systemd-run"):
+        cmd = ["systemd-run", "--user", "--wait", "--quiet", "--collect", "/bin/bash", str(wrapper), *args]
+    else:
+        cmd = ["/bin/bash", str(wrapper), *args]
     return subprocess.run(cmd, cwd=wrapper.parent, env=scheduler_env()).returncode
 
 
@@ -239,7 +274,10 @@ def remove() -> str:
         subprocess.run(["launchctl", "bootout", f"gui/{os.getuid()}", str(plist)], capture_output=True)
         plist.unlink(missing_ok=True)
         return "Removed the launchd agent."
-    if shutil.which("systemctl"):
+    if _systemd():
         subprocess.run(["systemctl", "--user", "disable", "--now", f"{stem}.timer"], capture_output=True)
-        return "Disabled the systemd timer."
+        for unit in _units(stem):
+            unit.unlink(missing_ok=True)
+        subprocess.run(["systemctl", "--user", "daemon-reload"], capture_output=True)
+        return "Removed the systemd timer."
     return "Remove the crontab line by hand with 'crontab -e'."

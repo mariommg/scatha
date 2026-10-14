@@ -1,6 +1,7 @@
 """Setup pieces that need no network: config, topics, schedules, answers files."""
 
 import json
+import os
 import sys
 
 import pytest
@@ -217,3 +218,55 @@ def test_scheduler_env_drops_what_setup_loaded(monkeypatch):
     env = scheduler.scheduler_env()
     assert not {"VIRTUAL_ENV", "TYPESAFE_API_KEY", "CLAUDE_BIN"} & set(env)
     assert "/x/venv" not in env["PATH"]
+
+
+class FakeLinux:
+    """systemctl on PATH; 'bus' says whether this session reaches the user manager."""
+
+    def __init__(self, monkeypatch, tmp_path, bus):
+        self.calls, self.bus = [], bus
+        monkeypatch.setattr(sys, "platform", "linux")
+        monkeypatch.setattr(scheduler.Path, "home", lambda: tmp_path)
+        monkeypatch.setattr(scheduler.shutil, "which", lambda name: f"/usr/bin/{name}")
+        monkeypatch.setattr(scheduler.subprocess, "run", self.run)
+
+    def run(self, cmd, **kw):
+        self.calls.append((cmd, kw))
+        down = cmd[:3] == ["systemctl", "--user", "show-environment"] and not self.bus
+        return type("Done", (), {"returncode": 1 if down else 0, "stdout": "", "stderr": ""})()
+
+
+SCHED = {"schedule": {"cadence": "weekly", "day": "Saturday", "time": "00:01"}}
+
+
+def test_unreachable_systemd_prints_a_crontab_line_instead_of_failing(home, monkeypatch, tmp_path):
+    fake = FakeLinux(monkeypatch, tmp_path, bus=False)
+    said = scheduler.install(SCHED)
+    assert "crontab -e" in said and "enable-linger" in said
+    assert not (tmp_path / ".config/systemd/user").exists()
+    assert scheduler.installed() is None  # a crontab line can't be checked, so no false ✗ either
+    assert not any(c[0][:2] == ["systemctl", "--user"] and "enable" in c[0] for c in fake.calls)
+
+
+def test_unschedule_removes_the_systemd_units(home, monkeypatch, tmp_path):
+    FakeLinux(monkeypatch, tmp_path, bus=True)
+    scheduler.install(SCHED)
+    units = list((tmp_path / ".config/systemd/user").iterdir())
+    assert len(units) == 2
+    scheduler.remove()
+    assert not any(u.exists() for u in units)
+
+
+def test_linux_test_drive_runs_inside_systemd(home, monkeypatch, tmp_path):
+    fake = FakeLinux(monkeypatch, tmp_path, bus=True)
+    scheduler.run_now(["--preview"])
+    cmd = fake.calls[-1][0]
+    assert cmd[:3] == ["systemd-run", "--user", "--wait"] and cmd[-1] == "--preview"
+
+
+def test_test_drive_without_systemd_gets_the_bare_scheduler_path(home, monkeypatch, tmp_path):
+    fake = FakeLinux(monkeypatch, tmp_path, bus=False)
+    monkeypatch.setenv("PATH", "/home/me/.nvm/versions/node/v22/bin:/usr/bin:/bin")
+    scheduler.run_now([])
+    cmd, kw = fake.calls[-1]
+    assert cmd[0] == "/bin/bash" and kw["env"]["PATH"].split(os.pathsep) == ["/usr/bin", "/bin"]
