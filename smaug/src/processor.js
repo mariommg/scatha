@@ -614,13 +614,28 @@ export function tcoLinksOf(text, quotedText) {
   return links;
 }
 
-/** What an expanded link points at. Order matters: X article URLs are on x.com too. */
+/** True if host is one of the domains or a subdomain of one. */
+function onSite(host, ...domains) {
+  return domains.some(domain => host === domain || host.endsWith(`.${domain}`));
+}
+
+/**
+ * What an expanded link points at, judged by its site, not by text anywhere in the URL
+ * (cmux.com and dropbox.com contain "x.com"). Order matters: X article URLs are on x.com too.
+ */
 export function linkType(url) {
-  if (url.includes('github.com')) return 'github';
-  if (url.includes('youtube.com') || url.includes('youtu.be')) return 'video';
-  if (url.includes('/i/article/')) return 'x-article';
-  if (url.includes('x.com') || url.includes('twitter.com')) {
-    return url.includes('/photo/') || url.includes('/video/') ? 'media' : 'tweet';
+  let u;
+  try {
+    u = new URL(url);
+  } catch {
+    return 'article';
+  }
+  const host = u.hostname.toLowerCase();
+  if (onSite(host, 'github.com')) return 'github';
+  if (onSite(host, 'youtube.com', 'youtu.be')) return 'video';
+  if (onSite(host, 'x.com', 'twitter.com')) {
+    if (u.pathname.includes('/i/article/')) return 'x-article';
+    return u.pathname.includes('/photo/') || u.pathname.includes('/video/') ? 'media' : 'tweet';
   }
   if (url.match(/\.(jpg|jpeg|png|gif|webp)$/i)) return 'image';
   return 'article';

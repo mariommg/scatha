@@ -56,5 +56,14 @@ used; the router in `../router` sorts and writes notes instead.
   contained a listed domain anywhere, so `microsoft.com` counted as `ft.com` (and a
   domain in a path, query, or lookalike host counted too), and the article body was
   never fetched. It now parses the host and matches the domain or a subdomain of it.
+- **Link types by site.** `linkType` judged links by text anywhere in the URL, so
+  `cmux.com` and `dropbox.com` (both contain `x.com`) were treated as tweets and their
+  pages never fetched; a domain in a path or query counted too. It now parses the
+  host and matches the site or a subdomain. Of 466 past links, only `cmux.com` changes.
+- **Article detection is testable.** The link-type, t.co, direct-article, and
+  quoted-article logic moved out of `fetchAndPrepareBookmarks` (and a closure in
+  `fetchXArticleContent`) into six exported functions; the tests that copied that
+  logic now call them. Byte-identical output on live bookmarks. Five fixture-only
+  tests and their fixtures removed.
 - **Sample data removed.** The upstream author's own `bookmarks.md` and `knowledge/`
   examples are not included.

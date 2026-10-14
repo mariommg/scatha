@@ -33,6 +33,20 @@ describe('X article URL detection', () => {
     assert.strictEqual(linkType('https://x.com/user/status/123456789'), 'tweet');
   });
 
+  test('the site decides the type, not text anywhere in the URL', () => {
+    // 2026-10-14: cmux.com (cmu + x.com) was treated as a tweet, so its page was never fetched
+    for (const url of ['https://cmux.com/', 'https://www.dropbox.com/s/a', 'https://www.netflix.com/title/1',
+      'https://linux.com/news', 'https://example.com/?ref=x.com', 'https://example.com/i/article/123',
+      'https://notgithub.com/a/b', 'https://example.com/youtube.com']) {
+      assert.strictEqual(linkType(url), 'article', url);
+    }
+    assert.strictEqual(linkType('https://mobile.twitter.com/u/status/1'), 'tweet');
+    assert.strictEqual(linkType('https://www.github.com/a/b'), 'github');
+    assert.strictEqual(linkType('https://m.youtube.com/watch?v=1'), 'video');
+    assert.strictEqual(linkType('https://X.COM/u/status/1'), 'tweet');
+    assert.strictEqual(linkType('not a url'), 'article');
+  });
+
   test('other link types', () => {
     assert.strictEqual(linkType('https://github.com/a/b'), 'github');
     assert.strictEqual(linkType('https://youtu.be/abc'), 'video');
