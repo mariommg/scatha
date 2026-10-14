@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sorting Desk</title>
+<style>
+:root {
+  --bg: #eef1f4; --paper: #fbfcfd; --ink: #17202b; --muted: #5b6878; --rule: #d3dae2;
+  --accent: #1f5fbf; --warn: #9a5b00; --warn-bg: #fff3dc; --ok: #1d7a4a; --ok-bg: #e2f4ea;
+  --bad: #b3261e; --bad-bg: #fde7e5; --skip-bg: #e4e8ec;
+  --ui: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --body: Georgia, "Times New Roman", serif;
+  --mono: ui-monospace, Consolas, "Cascadia Mono", monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12171d; --paper: #1a2129; --ink: #e6ebf1; --muted: #9aa7b6; --rule: #2c3640;
+    --accent: #6ea2ff; --warn: #f0b75a; --warn-bg: #3a2c14; --ok: #6fd39d; --ok-bg: #16301f;
+    --bad: #ff8a80; --bad-bg: #3a1a18; --skip-bg: #232b34; color-scheme: dark;
+  }
+  :root:not([data-theme="light"]) [style*="--cl"] { --c: var(--cd); }
+}
+:root[data-theme="dark"] {
+  --bg: #12171d; --paper: #1a2129; --ink: #e6ebf1; --muted: #9aa7b6; --rule: #2c3640;
+  --accent: #6ea2ff; --warn: #f0b75a; --warn-bg: #3a2c14; --ok: #6fd39d; --ok-bg: #16301f;
+  --bad: #ff8a80; --bad-bg: #3a1a18; --skip-bg: #232b34; color-scheme: dark;
+}
+[style*="--cl"] { --c: var(--cl); }
+:root[data-theme="dark"] [style*="--cl"] { --c: var(--cd); }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 var(--ui); }
+.wrap { max-width: 920px; margin: 0 auto; padding: 24px 16px 96px; display: grid; gap: 24px; }
+h1, h2 { margin: 0; text-wrap: balance; }
+h1 { font-size: 28px; letter-spacing: -0.01em; }
+h2 { font-size: 19px; }
+p { margin: 0; }
+.lede { color: var(--muted); max-width: 68ch; }
+.eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.banner { padding: 10px 14px; border-radius: 8px; background: var(--warn-bg); color: var(--warn); }
+.banner.bad { background: var(--bad-bg); color: var(--bad); }
+header { display: grid; gap: 8px; }
+.toprow { display: flex; justify-content: space-between; gap: 12px; align-items: start; flex-wrap: wrap; }
+button { font: inherit; color: inherit; }
+.btn { font-size: 14px; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--rule); background: var(--paper); cursor: pointer; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+
+/* topics */
+details.topics > summary { cursor: pointer; font-weight: 600; font-size: 17px; padding: 4px 0; }
+.tgrid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); margin-top: 12px; }
+.topic { background: var(--paper); border: 1px solid var(--rule); border-top: 4px solid var(--c); border-radius: 8px; padding: 12px 14px; display: grid; gap: 6px; min-width: 0; }
+.topic h3 { margin: 0; font-size: 16px; display: flex; gap: 8px; align-items: baseline; }
+.topic .k { font-family: var(--mono); font-size: 11px; color: var(--muted); border: 1px solid var(--rule); border-radius: 4px; padding: 0 5px; }
+.topic dl { margin: 0; display: grid; gap: 4px; font-size: 13.5px; }
+.topic dt { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.topic dd { margin: 0 0 4px; font-family: var(--body); }
+.fine { font-size: 13px; color: var(--muted); }
+
+/* bar */
+.bar { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--rule); padding: 10px 0; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+.filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.filters button { font-size: 13px; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--rule); background: var(--paper); cursor: pointer; }
+.filters button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.filters .n { opacity: .7; margin-left: 4px; font-variant-numeric: tabular-nums; }
+.progress { font-size: 13px; color: var(--muted); display: flex; gap: 10px; align-items: center; }
+.meter { width: 110px; height: 6px; border-radius: 3px; background: var(--rule); overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--ok); width: 0; transition: width .3s; }
+.save { min-width: 9ch; text-align: right; }
+.save.err { color: var(--bad); font-weight: 600; }
+.keys { font-size: 12px; color: var(--muted); }
+kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--rule); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--paper); }
+
+/* slips */
+.slips { display: grid; gap: 14px; }
+.slip { background: var(--paper); border: 1px solid var(--rule); border-radius: 8px; padding: 16px; display: grid; gap: 12px; min-width: 0; scroll-margin-top: 64px; }
+.slip.current { outline: 2px solid var(--accent); outline-offset: 2px; }
+.slip.done { border-color: color-mix(in srgb, var(--ok) 50%, var(--rule)); }
+.head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: baseline; justify-content: space-between; }
+.who { font-weight: 600; }
+.who a { color: var(--ink); text-decoration: none; border-bottom: 1px solid var(--rule); }
+.who a:hover { border-color: var(--accent); }
+.who .nm, .who .dt { color: var(--muted); font-weight: 400; font-size: 13px; }
+.tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.pill { font-size: 12px; padding: 2px 9px; border-radius: 999px; white-space: nowrap; background: var(--skip-bg); color: var(--muted); }
+.pill.close { background: var(--warn-bg); color: var(--warn); }
+.pill.lang { background: var(--skip-bg); color: var(--ink); }
+.notebox { border-left: 3px solid var(--c, var(--rule)); padding: 6px 10px; background: var(--bg); border-radius: 0 6px 6px 0; font-size: 14px; display: grid; gap: 2px; }
+.notebox .t { font-weight: 600; }
+.notebox .s { font-family: var(--body); }
+.notebox a { color: var(--accent); font-size: 12.5px; }
+.text { font-family: var(--body); font-size: 16px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 68ch; }
+.text.clamp { max-height: 11em; overflow: hidden; -webkit-mask-image: linear-gradient(#000 65%, transparent); mask-image: linear-gradient(#000 65%, transparent); }
+.textlink { font-size: 13px; background: none; border: none; color: var(--accent); cursor: pointer; padding: 0; justify-self: start; }
+.quote { font-family: var(--body); font-size: 14px; color: var(--muted); border-left: 3px solid var(--rule); padding-left: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+details.extra summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+details.extra .quote { margin-top: 6px; }
+.links { display: grid; gap: 3px; font-size: 13px; }
+.links a { color: var(--accent); overflow-wrap: anywhere; }
+.links .kind { font-family: var(--mono); font-size: 10.5px; color: var(--muted); margin-right: 6px; text-transform: uppercase; }
+.call { display: grid; gap: 4px; }
+.prob { display: grid; grid-template-columns: minmax(0, 170px) 1fr 40px; gap: 10px; align-items: center; font-size: 13px; }
+.prob .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); }
+.prob.top .lbl { color: var(--ink); font-weight: 600; }
+.track { position: relative; height: 8px; background: var(--bg); border-radius: 4px; }
+.track b { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--c); }
+.track .tick { position: absolute; top: -3px; bottom: -3px; width: 1px; background: var(--muted); }
+.prob .v { text-align: right; font-family: var(--mono); font-size: 12px; }
+.verdict { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.vbtn { font-size: 13px; padding: 6px 11px; border-radius: 6px; border: 1px solid var(--rule); background: var(--paper); cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.vbtn .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
+.vbtn kbd { margin-left: 2px; }
+.vbtn.jev { border-style: dashed; border-color: var(--muted); }
+.vbtn.jev::after { content: "Jev"; font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.vbtn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border: 1px solid var(--ink); }
+.vbtn[aria-pressed="true"]::after, .vbtn[aria-pressed="true"] kbd { color: var(--bg); background: transparent; }
+.vsep { width: 1px; align-self: stretch; background: var(--rule); margin: 0 4px; }
+.noteline { display: flex; gap: 8px; align-items: center; }
+.noteline input { flex: 1; min-width: 0; font: inherit; font-size: 13px; color: var(--ink); background: var(--bg); border: 1px solid var(--rule); border-radius: 6px; padding: 5px 8px; }
+.state { font-size: 12px; color: var(--muted); min-width: 8ch; text-align: right; }
+.state.err { color: var(--bad); }
+.legacy { font-size: 12px; color: var(--warn); }
+.empty { color: var(--muted); padding: 24px; text-align: center; border: 1px dashed var(--rule); border-radius: 8px; }
+.closed { padding: 48px 16px; text-align: center; display: grid; gap: 8px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 560px) { .prob { grid-template-columns: minmax(0, 100px) 1fr 36px; } h1 { font-size: 24px; } .keys { display: none; } }
+@media (prefers-reduced-motion: reduce) { .meter i { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <header>
+    <span class="eyebrow" id="eyebrow">Sorting desk</span>
+    <div class="toprow">
+      <h1 id="title">Sorting Desk</h1>
+      <button class="btn primary" id="done" type="button">Done</button>
+    </div>
+    <p class="lede">For each item, click the topic it belongs in. Pick <b>Don't keep</b> if it fits none of them, or <b>Not sure</b> if you're torn (a note helps). Only what you click counts: an item you leave alone is not taken as agreeing with Jev. Each click is saved right away.</p>
+    <p class="banner" id="stale" hidden>Your topic definitions changed after these scores were made. The scores below are for the old definitions. Close the desk and rebuild it to re-score.</p>
+    <p class="banner bad" id="fatal" hidden></p>
+  </header>
+
+  <section>
+    <details class="topics" id="topics-box">
+      <summary id="topics-sum">Your topics</summary>
+      <p class="fine" style="margin-top:8px">These are the definitions Jev read when it scored. They're read-only here: a changed definition needs a fresh score to mean anything.</p>
+      <div class="tgrid" id="topics"></div>
+    </details>
+  </section>
+
+  <section style="display:grid;gap:12px">
+    <div class="bar">
+      <div class="filters" role="group" aria-label="Show" id="filters"></div>
+      <div class="progress"><span id="prog"></span><span class="meter"><i id="meter"></i></span><span class="save" id="save" aria-live="polite"></span></div>
+    </div>
+    <p class="keys">Keys: <kbd>j</kbd>/<kbd>k</kbd> next/previous · <kbd>1</kbd>-<kbd>9</kbd> topic · <kbd>0</kbd> don't keep · <kbd>u</kbd> not sure · <kbd>x</kbd> clear · <kbd>o</kbd> original text</p>
+    <div class="slips" id="slips"></div>
+  </section>
+</div>
+
+<script>
+"use strict";
+const TOKEN = new URLSearchParams(location.hash.slice(1)).get("t") || "";
+const $ = (id) => document.getElementById(id);
+const el = (tag, attrs = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === "class") n.className = v;
+    else if (k === "style") n.setAttribute("style", v);
+    else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+    else n.setAttribute(k, v === true ? "" : v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) n.append(c.nodeType ? c : String(c));
+  return n;
+};
+
+let deck, verdicts = {}, topicByKey = {}, filter = "close", current = null, closed = false;
+const saving = new Map();   // id -> "saving" | "error"
+const queued = new Map();   // id -> payload waiting to be sent
+const noteTimers = new Map();
+
+function langName(code) {
+  try { return new Intl.DisplayNames(["en"], { type: "language" }).of(code) || code; } catch { return code; }
+}
+function colorVars(i) {
+  const h = Math.round((i * 137.508 + 215) % 360);
+  return `--cl:hsl(${h} 58% 40%);--cd:hsl(${h} 72% 70%)`;
+}
+function label(key) {
+  if (key === "drop") return "Don't keep";
+  if (key === "unsure") return "Not sure";
+  return topicByKey[key]?.label || key;
+}
+
+async function api(path, body) {
+  const r = await fetch(path, {
+    method: body === undefined ? "GET" : "POST",
+    headers: { "X-Desk-Token": TOKEN, "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`);
+  return r.json();
+}
+
+async function load() {
+  let data;
+  try { data = await api("/api/deck"); }
+  catch (e) {
+    const f = $("fatal");
+    f.hidden = false;
+    f.textContent = TOKEN ? `Couldn't load the desk (${e.message}). Is the terminal that opened it still running?`
+                          : "This page needs the full link from the terminal (it carries a key after the #).";
+    return;
+  }
+  deck = data.deck; verdicts = data.verdicts || {};
+  deck.topics.forEach((t, i) => { t.i = i; t.style = colorVars(i); topicByKey[t.key] = t; });
+  document.title = deck.title || "Sorting Desk";
+  $("title").textContent = deck.title || "Sorting Desk";
+  $("eyebrow").textContent = `${deck.items.length} items · ${deck.topics.length} topics · scored ${deck.built || ""}`;
+  $("stale").hidden = !data.stale;
+  window.VERDICTS_PATH = data.verdicts_path;
+  renderTopics();
+  renderFilters();
+  render();
+}
+
+function renderTopics() {
+  $("topics-sum").textContent = `Your topics (${deck.topics.length})`;
+  $("topics").replaceChildren(...deck.topics.map((t) => el("div", { class: "topic", style: t.style },
+    el("h3", {}, t.label, t.i < 9 ? el("span", { class: "k" }, String(t.i + 1)) : null),
+    el("dl", {},
+      t.question ? [el("dt", {}, "Question"), el("dd", {}, t.question)] : null,
+      t.yes_means ? [el("dt", {}, "Counts"), el("dd", {}, t.yes_means)] : null,
+      t.no_means ? [el("dt", {}, "Doesn't count"), el("dd", {}, t.no_means)] : null),
+  )));
+}
+
+const FILTERS = [
+  ["close", "Close calls", (it) => it.close],
+  ["open", "Unanswered", (it) => !verdicts[it.id]?.verdict],
+  ["done", "Answered", (it) => !!verdicts[it.id]?.verdict],
+  ["all", "All", () => true],
+];
+function renderFilters() {
+  $("filters").replaceChildren(...FILTERS.map(([k, name, fn]) =>
+    el("button", { type: "button", "aria-pressed": String(filter === k), onclick: () => { filter = k; renderFilters(); render(); } },
+      name, el("span", { class: "n" }, String(deck.items.filter(fn).length)))));
+}
+
+function visible() {
+  const fn = FILTERS.find((f) => f[0] === filter)[2];
+  const list = deck.items.filter(fn);
+  if (filter === "close") list.sort((a, b) => (a.gap ?? 1) - (b.gap ?? 1));
+  return list;
+}
+
+function render() {
+  const list = visible();
+  const box = $("slips");
+  if (!list.length) { box.replaceChildren(el("p", { class: "empty" }, "Nothing here.")); updateProgress(); return; }
+  box.replaceChildren(...list.map(slip));
+  updateProgress();
+}
+
+function updateProgress() {
+  const scope = filter === "close" ? deck.items.filter((i) => i.close) : deck.items;
+  const n = scope.filter((i) => verdicts[i.id]?.verdict).length;
+  $("prog").textContent = `${n} of ${scope.length} ${filter === "close" ? "close calls" : "items"} answered`;
+  $("meter").style.width = scope.length ? `${(100 * n) / scope.length}%` : "0";
+  const errs = [...saving.values()].filter((s) => s === "error").length;
+  const busy = [...saving.values()].filter((s) => s === "saving").length + queued.size;
+  const s = $("save");
+  s.className = "save" + (errs ? " err" : "");
+  s.textContent = errs ? `${errs} not saved` : busy ? "Saving…" : "All saved";
+}
+
+function closeTag(it) {
+  const tags = [];
+  if (it.pair) tags.push(el("span", { class: "pill close" }, `${label(it.pair[0])} vs ${label(it.pair[1])}, ${it.gap.toFixed(2)} apart`));
+  if (it.near_cut) tags.push(el("span", { class: "pill close" }, "near the keep/drop line"));
+  tags.push(el("span", { class: "pill" }, it.filed ? `filed in ${label(it.filed)}` : "was dropped"));
+  if (it.language) tags.push(el("span", { class: "pill lang" }, `translated from ${langName(it.language)}`));
+  return tags;
+}
+
+function slip(it) {
+  const v = verdicts[it.id] || {};
+  const node = el("article", { class: "slip" + (v.verdict ? " done" : ""), id: `s-${it.id}`, "data-id": it.id,
+                                onclick: () => setCurrent(it.id, false) });
+  if (current === it.id) node.classList.add("current");
+
+  const who = el("div", { class: "who" },
+    el("a", { href: it.url, target: "_blank", rel: "noopener" }, `@${it.author}`), " ",
+    it.author_name ? el("span", { class: "nm" }, it.author_name) : null, " ",
+    it.date ? el("span", { class: "dt" }, `· ${it.date}`) : null);
+  node.append(el("div", { class: "head" }, who, el("div", { class: "tags" }, closeTag(it))));
+
+  if (it.note) {
+    const nb = el("div", { class: "notebox", style: topicByKey[it.note.bucket]?.style },
+      el("span", { class: "t" }, `Note: ${it.note.title}`),
+      it.note.summary ? el("span", { class: "s" }, it.note.summary) : null,
+      it.note.path ? el("a", { href: `obsidian://open?path=${encodeURIComponent(it.note.path)}` }, "Open in Obsidian") : null);
+    node.append(nb);
+  }
+
+  const text = el("div", { class: "text" }, it.text || "(no text)");
+  node.append(text);
+  if (it.original) {
+    let showing = false;
+    const btn = el("button", { class: "textlink", type: "button", "data-orig": "1" }, `Show original (${langName(it.language)})`);
+    btn.onclick = (e) => { e.stopPropagation(); showing = !showing; text.textContent = showing ? it.original : it.text;
+      btn.textContent = showing ? "Show English" : `Show original (${langName(it.language)})`; clampCheck(); };
+    node.append(btn);
+  }
+  const more = el("button", { class: "textlink", type: "button", hidden: true }, "Show all");
+  node.append(more);
+  const clampCheck = () => {
+    text.classList.remove("clamp");
+    requestAnimationFrame(() => {
+      const long = text.scrollHeight > 230;
+      if (long && more.textContent === "Show all") text.classList.add("clamp");
+      more.hidden = !long;
+    });
+  };
+  more.onclick = (e) => { e.stopPropagation(); const open = more.textContent === "Show all";
+    text.classList.toggle("clamp", !open); more.textContent = open ? "Show less" : "Show all"; };
+  requestAnimationFrame(clampCheck);
+
+  if (it.quote) node.append(el("div", { class: "quote" }, it.quote));
+  if (it.image_text) node.append(el("details", { class: "extra" }, el("summary", {}, "Text in the images"), el("div", { class: "quote" }, it.image_text)));
+  if (it.links?.length) node.append(el("div", { class: "links" }, it.links.map((l) =>
+    el("div", {}, el("span", { class: "kind" }, l.kind || "link"), el("a", { href: l.url, target: "_blank", rel: "noopener" }, l.title || l.url)))));
+
+  const ranked = deck.topics.slice().sort((a, b) => (it.scores[b.key] ?? 0) - (it.scores[a.key] ?? 0));
+  node.append(el("div", { class: "call" }, ranked.map((t, i) => {
+    const p = it.scores[t.key] ?? 0;
+    return el("div", { class: "prob" + (i === 0 ? " top" : ""), style: t.style },
+      el("span", { class: "lbl" }, t.label),
+      el("span", { class: "track" }, el("b", { style: `width:${(p * 100).toFixed(1)}%` }), el("span", { class: "tick", style: `left:${deck.cutoff * 100}%`, title: "keep/drop line" })),
+      el("span", { class: "v" }, p.toFixed(2)));
+  })));
+
+  const jevPick = it.status === "skip" ? "drop" : it.placed;
+  const vbtn = (key, text, kb, style) => el("button", {
+    type: "button", class: "vbtn" + (key === jevPick ? " jev" : ""), style, "aria-pressed": String(v.verdict === key),
+    onclick: (e) => { e.stopPropagation(); choose(it.id, v.verdict === key ? null : key); },
+  }, style ? el("span", { class: "dot" }) : null, text, kb ? el("kbd", {}, kb) : null);
+  node.append(el("div", { class: "verdict" },
+    deck.topics.map((t) => vbtn(t.key, t.label, t.i < 9 ? String(t.i + 1) : null, t.style)),
+    el("span", { class: "vsep" }),
+    vbtn("drop", "Don't keep", "0"), vbtn("unsure", "Not sure", "u")));
+
+  const input = el("input", { type: "text", value: v.note || "", placeholder: "Note (optional): why, or what the definitions miss",
+    "aria-label": "Note", onclick: (e) => e.stopPropagation(),
+    oninput: (e) => { clearTimeout(noteTimers.get(it.id)); noteTimers.set(it.id, setTimeout(() => setNote(it.id, e.target.value), 700)); },
+    onblur: (e) => { clearTimeout(noteTimers.get(it.id)); if ((verdicts[it.id]?.note || "") !== e.target.value) setNote(it.id, e.target.value); },
+    onkeydown: (e) => { if (e.key === "Enter" || e.key === "Escape") e.target.blur(); } });
+  const st = saving.get(it.id);
+  node.append(el("div", { class: "noteline" }, input,
+    el("span", { class: "state" + (st === "error" ? " err" : ""), id: `st-${it.id}` },
+      st === "error" ? "not saved, retrying" : st === "saving" ? "saving…" : v.verdict ? `saved: ${label(v.verdict)}` : "")));
+  if (v.source && v.source !== "desk") node.append(el("p", { class: "legacy" }, `Answer carried over from ${v.source}. Click again to confirm or change it.`));
+  return node;
+}
+
+function rerenderSlip(id) {
+  const old = $(`s-${id}`);
+  const it = deck.items.find((i) => i.id === id);
+  if (old && it) old.replaceWith(slip(it));
+  renderFilters();
+  updateProgress();
+}
+
+function choose(id, verdict) {
+  verdicts[id] = { ...(verdicts[id] || {}), verdict, source: "desk" };
+  send(id);
+  rerenderSlip(id);
+}
+function setNote(id, note) {
+  verdicts[id] = { ...(verdicts[id] || {}), note };
+  send(id);
+}
+
+function send(id) {
+  const v = verdicts[id] || {};
+  queued.set(id, { id, verdict: v.verdict ?? null, note: v.note || "" });
+  if (saving.get(id) !== "saving") flush(id, 0);
+  updateProgress();
+}
+async function flush(id, attempt) {
+  const payload = queued.get(id);
+  if (!payload) return;
+  queued.delete(id);
+  saving.set(id, "saving");
+  try {
+    const r = await api("/api/verdict", payload);
+    if (r.record) verdicts[id] = r.record; else delete verdicts[id];
+    saving.delete(id);
+    if (queued.has(id)) return flush(id, 0);  // a newer click arrived while this one was in flight
+  } catch (e) {
+    if (!queued.has(id)) queued.set(id, payload);
+    saving.set(id, "error");
+    if (!closed) setTimeout(() => flush(id, attempt + 1), Math.min(30000, 1000 * 2 ** attempt));
+  }
+  const st = $(`st-${id}`);
+  if (st) {
+    const s = saving.get(id), v = verdicts[id];
+    st.className = "state" + (s === "error" ? " err" : "");
+    st.textContent = s === "error" ? "not saved, retrying" : v?.verdict ? `saved: ${label(v.verdict)}` : (v?.note ? "note saved" : "");
+  }
+  updateProgress();
+}
+
+function setCurrent(id, scroll = true) {
+  document.querySelectorAll(".slip.current").forEach((n) => n.classList.remove("current"));
+  current = id;
+  const n = id && $(`s-${id}`);
+  if (n) { n.classList.add("current"); if (scroll) n.scrollIntoView({ block: "start", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" }); }
+}
+function step(d) {
+  const ids = [...document.querySelectorAll(".slip")].map((n) => n.dataset.id);
+  if (!ids.length) return;
+  const i = ids.indexOf(current);
+  setCurrent(ids[i < 0 ? 0 : Math.max(0, Math.min(ids.length - 1, i + d))]);
+}
+document.addEventListener("keydown", (e) => {
+  if (!deck || e.target.matches("input, textarea") || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.key === "j") return step(1);
+  if (e.key === "k") return step(-1);
+  if (!current) return;
+  let key = null;
+  if (/^[1-9]$/.test(e.key)) key = deck.topics[Number(e.key) - 1]?.key;
+  else if (e.key === "0") key = "drop";
+  else if (e.key === "u") key = "unsure";
+  else if (e.key === "x") key = "__clear";
+  else if (e.key === "o") { $(`s-${current}`)?.querySelector("[data-orig]")?.click(); return; }
+  if (!key) return;
+  e.preventDefault();
+  choose(current, key === "__clear" ? null : key);
+  if (key !== "__clear") setTimeout(() => step(1), 150);
+});
+
+window.addEventListener("beforeunload", (e) => { if (queued.size || [...saving.values()].length) { e.preventDefault(); e.returnValue = ""; } });
+
+$("done").onclick = async () => {
+  document.activeElement?.blur?.();
+  for (let i = 0; i < 50 && (queued.size || [...saving.values()].some((s) => s === "saving")); i++) await new Promise((r) => setTimeout(r, 100));
+  if (queued.size || saving.size) {
+    $("fatal").hidden = false;
+    $("fatal").textContent = "Some answers haven't saved yet. Wait for \"All saved\" and press Done again.";
+    return;
+  }
+  try { await api("/api/done", {}); } catch {}
+  closed = true;
+  const answered = Object.values(verdicts).filter((v) => v.verdict).length;
+  $("app").replaceChildren(el("div", { class: "closed" }, el("h1", {}, "Desk closed"),
+    el("p", { class: "lede" }, `${answered} answers are saved in ${window.VERDICTS_PATH}. You can close this tab.`)));
+};
+
+load();
+</script>
+</body>
+</html>

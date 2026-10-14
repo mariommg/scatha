@@ -103,6 +103,8 @@ A note that links a GitHub repo also carries that repo's vital signs: `repo`, `r
 - `yes_means`: what counts, with concrete kinds of posts
 - `no_means`: what doesn't, *especially* the near-misses that belong to your other topics
 
+**The sorting desk shows you where Jev is torn.** Run `setup review`. The first time, it re-scores every bookmark scatha has processed against your current topics (Jev only: a few cents, about 2,300 tokens a bookmark), then opens a page in your browser. The page runs on your machine and nobody else can reach it. It opens on the close calls: bookmarks where two topics scored almost the same, or where the best score sits near the keep/drop line. For each one, click the topic it belongs in, **Don't keep**, or **Not sure**. Each click is saved right away to `tuning/verdicts.json` in your data folder; anything you don't click doesn't count. Posts that aren't in English are shown in English (the note's translation if there is a note, otherwise one Haiku translation, kept for next time), with the original a click away. Keys: `j`/`k` to move, `1`-`9` for a topic, `0` don't keep, `u` not sure. After you edit `topics.yaml`, run `setup review --rebuild` to re-score. Your answers are the test any rewording has to pass: `uv run --project router python router/regression/score.py <routes.json> ~/.scatha/tuning/verdicts.json`.
+
 When a bookmark lands in the wrong place, open that run's `work/runs/<date>/routes.md` to see every score, then fix the wording. Some patterns that work:
 
 - **Name the near-miss.** If job-hunting advice keeps landing in Life hacks, add "Advice about careers or job searching belongs to knowledge work" to Life hacks' `no_means`.

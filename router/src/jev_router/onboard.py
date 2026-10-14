@@ -7,6 +7,7 @@
     uv run --project router python -m jev_router.onboard schedule     # change when it runs
     uv run --project router python -m jev_router.onboard status       # what's set up, what isn't
     uv run --project router python -m jev_router.onboard unschedule
+    uv run --project router python -m jev_router.onboard review       # sorting desk: check Jev's calls (--rebuild)
 
 (setup.ps1 / setup.sh run the same thing; extra words pass through.)
 
@@ -728,8 +729,11 @@ def main(argv: list[str] | None = None) -> int:
     COLOR = enable_color()
     ap = argparse.ArgumentParser(prog=setup_cmd())
     ap.add_argument("command", nargs="?", default="all",
-                    choices=["all", "x-login", "topics", "schedule", "status", "unschedule"])
+                    choices=["all", "x-login", "topics", "schedule", "status", "unschedule", "review"])
     ap.add_argument("--answers", help="answers file from docs/onboarding.html (no secrets)")
+    ap.add_argument("--rebuild", action="store_true", help="review: re-score every bookmark with the current topics")
+    ap.add_argument("--import", dest="import_file", metavar="FILE", help="review: carry over answers from an older review file")
+    ap.add_argument("--no-browser", action="store_true", help="review: print the link instead of opening a browser")
     ap.add_argument("--skip-verify", action="store_true", help=argparse.SUPPRESS)  # tests only
     args = ap.parse_args(argv)
     answers = load_answers(args.answers)
@@ -744,6 +748,9 @@ def main(argv: list[str] | None = None) -> int:
             return 0 if step_topics(cfg, answers.get("topics"), answers.get("draft_definitions")) else 1
         if args.command == "schedule":
             return 0 if step_schedule(cfg, answers.get("schedule"), answers.get("batch_size")) else 1
+        if args.command == "review":
+            from . import review
+            return review.main(cfg, args.rebuild, args.import_file, not args.no_browser, say)
         if args.command == "unschedule":
             say(scheduler.remove())
             return 0
