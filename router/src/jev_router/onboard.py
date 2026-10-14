@@ -116,7 +116,7 @@ def ask(prompt: str, default: str | None = None, clearable: bool = False) -> str
         v = v or (default or "")
         if clearable and v == "-":
             return ""
-        if v or default is not None:
+        if v or default is not None or clearable:  # an optional question: Enter with nothing means none
             return v
         say(dim("  (I need an answer here.)"))
 
@@ -137,9 +137,66 @@ def choose(prompt: str, options: list[str], default: int = 1) -> int:
         say(dim(f"  (Pick a number from 1 to {len(options)}.)"))
 
 
+def read_hidden(prompt: str, getch, write) -> str:
+    """Hidden input that still shows a paste landed: a running character count on the prompt
+    line, so a paste that didn't take (or took twice) is visible before Enter."""
+    chars: list[str] = []
+
+    def redraw():
+        n = len(chars)
+        write(f"\r{prompt}{'*' * min(n, 12)}{f' ({n} characters)' if n else ''}   ")
+
+    redraw()
+    while True:
+        c = getch()
+        if c in ("\r", "\n", ""):
+            break
+        if c == "\x03":
+            raise KeyboardInterrupt
+        if c == "\x1b":  # an escape sequence (arrow keys, bracketed-paste markers): skip it whole
+            c = getch()
+            if c == "[":
+                while not (c := getch()).isalpha() and c != "~":
+                    pass
+            continue
+        if c in ("\x00", "\xe0"):  # Windows: arrow and function keys arrive as two characters
+            getch()
+            continue
+        if c in ("\x7f", "\b"):
+            if chars:
+                chars.pop()
+        elif c.isprintable():
+            chars.append(c)
+        redraw()
+    write("\r\n")
+    return "".join(chars)
+
+
+def hidden_input(prompt: str) -> str:
+    if not sys.stdin.isatty():
+        return getpass.getpass(prompt)
+    out = lambda s: (sys.stdout.write(s), sys.stdout.flush())
+    if sys.platform == "win32":
+        import msvcrt
+        return read_hidden(prompt, msvcrt.getwch, out)
+    import termios
+    import tty
+    fd = sys.stdin.fileno()
+    saved = termios.tcgetattr(fd)
+    try:
+        tty.setraw(fd)  # keystrokes one at a time, nothing echoed; Ctrl+C arrives as \x03
+        return read_hidden(prompt, lambda: sys.stdin.read(1), out)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, saved)
+
+
 def secret(prompt: str) -> str:
     while True:
-        v = getpass.getpass(f"  {prompt} (typing is hidden): ").strip()
+        v = hidden_input(f"  {prompt} (hidden; paste, then Enter): ").strip()
+        half = len(v) // 2
+        if v and len(v) % 2 == 0 and v[:half] == v[half:]:
+            say(dim(f"  (That looks like the same thing pasted twice; using it once: {half} characters.)"))
+            v = v[:half]
         if v:
             return v
         say(dim("  (Nothing came through. Paste it and press Enter.)"))
@@ -259,10 +316,11 @@ def step_notes(cfg: dict, preset: str | None = None, verify: bool = True) -> boo
         if not app.has_secret(app.SECRETS["anthropic"]):
             hint("Get a key at https://console.anthropic.com (Settings → API keys).")
             os.environ[app.SECRETS["anthropic"]] = secret("Anthropic API key")
-    err = verify_notes(cfg) if verify else None
-    if err:
-        bad(f"Haiku didn't answer: {err[:200]}")
-        return False
+    while err := verify_notes(cfg) if verify else None:
+        bad(f"Haiku didn't answer: {checks.notes_error_in_words(err, cfg['notes_backend'])}")
+        # Usually fixable without leaving: log in again in another terminal, then retry here
+        if cfg["notes_backend"] != "claude-code" or not yes("Fixed it in another terminal? Try again", default=True):
+            return False
     if cfg["notes_backend"] == "anthropic-api":
         app.save_secret(app.SECRETS["anthropic"], os.environ[app.SECRETS["anthropic"]])
     ok("Haiku answered.")
@@ -285,7 +343,7 @@ def pick_topics() -> list[dict]:
             "preset": True} for n in chosen]
     say()
     while yes("Add a topic of your own?", default=not out):
-        label = ask("Name (short, like 'Woodworking')")
+        label = ask("Name (short, like 'Sports')")
         desc = ask("In one line, what belongs here?")
         out.append({"label": label, "description": desc})
         say()
@@ -321,9 +379,15 @@ def pick_base(found: list[Path], prompt: str, current: Path | None = None) -> Pa
     return Path(ask("Folder path", default=str(current.parent) if current and not cur else None)).expanduser()
 
 
+def folder_name(label: str) -> str:
+    """A topic's default folder: its words run together, each capitalized ("General knowledge" ->
+    "GeneralKnowledge"), so paths need no quoting. Letters in any script survive."""
+    return "".join(w[:1].upper() + w[1:] for w in re.findall(r"[^\W_]+", label)) or "Notes"
+
+
 def pick_subfolder(base: Path, label: str, current: Path | None = None) -> Path:
-    """Enter keeps the suggestion (the current subfolder, else the topic name); '-' means none."""
-    suggestion = label
+    """Enter keeps the suggestion (the current subfolder, else the topic's folder name); '-' means none."""
+    suggestion = folder_name(label)
     if current is not None and current.is_relative_to(base):
         rel = str(current.relative_to(base))
         suggestion = "-" if rel == "." else rel
@@ -383,7 +447,7 @@ def step_topics(cfg: dict, preset_topics: list[dict] | None = None, draft: bool 
         hint("Each topic gets a subfolder named after it. You can change any of them next.")
         for t in preset_topics:
             if not t.get("destination"):
-                t["destination"] = str(base / t["label"])
+                t["destination"] = str(base / folder_name(t["label"]))
     review_destinations(preset_topics, found)
 
     # Definitions
@@ -520,8 +584,8 @@ def assess(cfg: dict) -> dict[int, tuple[bool, str]]:
     writer = "Claude Code" if cfg["notes_backend"] == "claude-code" else "Anthropic API"
     if cfg["notes_backend"] == "anthropic-api" and not app.has_secret(app.SECRETS["anthropic"]):
         s[4] = (False, "not set up yet")
-    elif cfg["notes_backend"] == "claude-code" and cfg["tools"]["claude"] == "claude" and not checks.found("claude"):
-        s[4] = (False, "not set up yet")
+    elif cfg["notes_backend"] == "claude-code" and cfg["tools"]["claude"] == "claude":
+        s[4] = (False, "not set up yet")  # step 4 records where claude is; the bare default means it never finished
     else:
         err = verify_notes(cfg)
         extra = "; about you: set" if cfg.get("reader_profile") else ""

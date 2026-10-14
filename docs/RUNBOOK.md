@@ -99,7 +99,7 @@ A note that links a GitHub repo also carries that repo's vital signs: `repo`, `r
 
 `topics.yaml` is plain words, and Jev reads them literally. Three fields per topic:
 
-- `question`: one yes/no question ("Is this item about woodworking?")
+- `question`: one yes/no question ("Is this item about sports?")
 - `yes_means`: what counts, with concrete kinds of posts
 - `no_means`: what doesn't, *especially* the near-misses that belong to your other topics
 

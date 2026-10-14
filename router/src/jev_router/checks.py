@@ -61,6 +61,19 @@ def verify_notes(cfg: dict) -> str | None:
         return f"{type(e).__name__}: {e}"
 
 
+_LOGGED_OUT = re.compile(r"authenticat|oauth|/login|not logged in|invalid api key|\b401\b", re.I)
+
+
+def notes_error_in_words(err: str, backend: str) -> str:
+    """verify_notes' error, with the common one (a login that expired) said plainly."""
+    if _LOGGED_OUT.search(err):
+        if backend == "claude-code":
+            return ("Claude Code isn't logged in, or its login expired. In a terminal, run 'claude', "
+                    "type /login, and sign in")
+        return "the Anthropic API key was rejected"
+    return err[:200]
+
+
 def preflight(cfg: dict) -> list[str]:
     """What a run needs, in plain words: one line per thing that isn't working. Empty means go."""
     problems = []
@@ -72,5 +85,5 @@ def preflight(cfg: dict) -> list[str]:
         problems.append(f"Jev didn't answer, so the TypeSafe key may be revoked or out of credit ({err[:100]})")
     if err := verify_notes(cfg):
         writer = "Claude Code" if cfg["notes_backend"] == "claude-code" else "the Anthropic API"
-        problems.append(f"Haiku didn't answer through {writer}: {err[:160]}")
+        problems.append(f"Haiku didn't answer through {writer}: {notes_error_in_words(err, cfg['notes_backend'])}")
     return problems

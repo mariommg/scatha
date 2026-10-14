@@ -270,3 +270,83 @@ def test_test_drive_without_systemd_gets_the_bare_scheduler_path(home, monkeypat
     scheduler.run_now([])
     cmd, kw = fake.calls[-1]
     assert cmd[0] == "/bin/bash" and kw["env"]["PATH"].split(os.pathsep) == ["/usr/bin", "/bin"]
+
+
+# ----- first Linux install, 2026-10-14 -----
+
+@pytest.mark.parametrize("label,folder", [("General knowledge", "GeneralKnowledge"), ("AI", "AI"),
+                                          ("Life hacks & tips", "LifeHacksTips"), ("café culture", "CaféCulture"),
+                                          ("!!!", "Notes")])
+def test_topic_folders_are_one_word(label, folder):
+    assert onboard.folder_name(label) == folder
+
+
+def test_subfolder_suggestion_is_the_folder_name(tmp_path, monkeypatch):
+    answers(monkeypatch, "")
+    assert onboard.pick_subfolder(tmp_path, "General knowledge") == tmp_path / "GeneralKnowledge"
+
+
+def test_enter_skips_an_optional_question(monkeypatch):
+    answers(monkeypatch, "")
+    assert onboard.ask("ntfy topic (Enter to skip)", default=None, clearable=True) == ""
+
+
+def keys(*chunks):
+    """A fake terminal: the characters a user's keystrokes and pastes deliver, in order."""
+    it = iter("".join(chunks))
+    return lambda: next(it)
+
+
+def test_hidden_input_shows_a_running_count(capsys):
+    got = onboard.read_hidden("  token: ", keys("abc123", "\x7f", "\r"), sys.stdout.write)
+    assert got == "abc12"
+    assert "6 characters" in capsys.readouterr().out  # visible while pasting, before Enter
+
+
+def test_hidden_input_ignores_bracketed_paste_markers():
+    assert onboard.read_hidden("", keys("\x1b[200~", "secret", "\x1b[201~", "\r"), lambda s: None) == "secret"
+
+
+def test_hidden_input_ctrl_c_stops():
+    with pytest.raises(KeyboardInterrupt):
+        onboard.read_hidden("", keys("ab\x03"), lambda s: None)
+
+
+def test_a_double_paste_is_caught(monkeypatch, capsys):
+    monkeypatch.setattr(onboard, "hidden_input", lambda prompt: "a1b2c3a1b2c3")
+    assert onboard.secret("auth_token") == "a1b2c3"
+    assert "twice" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("err,expect", [
+    ("RuntimeError: claude -p failed: Failed to authenticate: OAuth session expired and could not be refreshed", "/login"),
+    ("RuntimeError: claude -p failed: Invalid API key · Please run /login", "/login"),
+    ("RuntimeError: claude -p failed: rate limited", "rate limited"),
+])
+def test_claude_login_failures_are_explained(err, expect):
+    from jev_router import checks
+    assert expect in checks.notes_error_in_words(err, "claude-code")
+
+
+def test_recap_does_not_count_an_unfinished_step_4(home, monkeypatch):
+    from jev_router import checks
+    monkeypatch.setattr(onboard, "verify_notes", lambda cfg: None)  # Haiku answers fine...
+    monkeypatch.setattr(checks, "found", lambda tool: tool)
+    monkeypatch.setattr(onboard, "verify_x", lambda cfg: None)
+    monkeypatch.setattr(onboard, "verify_typesafe", lambda: "no key")
+    monkeypatch.setattr(onboard, "node_major", lambda node: 22)
+    cfg = app.load_config()  # ...but step 4 never recorded where claude is
+    assert onboard.assess(cfg)[4][0] is False
+    cfg["tools"]["claude"] = "/home/u/.local/bin/claude"
+    assert onboard.assess(cfg)[4][0] is True
+
+
+def test_step_4_waits_for_a_login_fix_instead_of_quitting(home, monkeypatch, capsys):
+    replies = iter(["RuntimeError: claude -p failed: Failed to authenticate: OAuth session expired", None])
+    monkeypatch.setattr(onboard, "verify_notes", lambda cfg: next(replies))
+    monkeypatch.setattr(onboard, "which", lambda name: "/home/u/.local/bin/claude")
+    answers(monkeypatch, "", "")  # Enter: yes, fixed it, try again; Enter: skip "About you"
+    cfg = app.load_config()
+    assert onboard.step_notes(cfg, preset="claude-code")
+    assert "/login" in capsys.readouterr().out
+    assert cfg["tools"]["claude"] == "/home/u/.local/bin/claude"

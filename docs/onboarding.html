@@ -239,8 +239,10 @@ td:first-child { width: 42%; }
   const save = () => { store.set("plan", state); render(); };
   const sep = () => (state.os === "win" ? "\\" : "/");
   const join = (a, b) => !a ? b : !b ? a : a.replace(/[\\/]+$/, "") + sep() + b;
+  // A topic's default folder, as the wizard names it: "General knowledge" -> "GeneralKnowledge".
+  const folderName = label => (label.match(/[\p{L}\p{N}]+/gu) || []).map(w => w[0].toUpperCase() + w.slice(1)).join("") || "Notes";
   // Blank when there's no folder yet: the wizard then offers your Obsidian vaults.
-  const destOf = t => t.destination || (state.vault ? join(state.vault, t.sub ?? t.label) : "");
+  const destOf = t => t.destination || (state.vault ? join(state.vault, t.sub ?? folderName(t.label)) : "");
 
   // ---- checks ----
   const checked = store.get("checks", {});
@@ -277,7 +279,7 @@ td:first-child { width: 42%; }
           el("input", { type: "text", id: `tf-${i}`, value: t.base || "", placeholder: state.vault || "default folder",
             oninput: e => { t.base = e.target.value; t.destination = t.base ? join(t.base, t.sub) : ""; store.set("plan", state); renderTree(); renderOut(); } })),
         el("label", {}, "Subfolder",
-          el("input", { type: "text", id: `ts-${i}`, value: t.sub ?? t.label,
+          el("input", { type: "text", id: `ts-${i}`, value: t.sub ?? folderName(t.label),
             oninput: e => { t.sub = e.target.value; t.destination = t.base ? join(t.base, t.sub) : ""; store.set("plan", state); renderTree(); renderOut(); } }))))));
     if (active) { const f = document.getElementById(active); if (f) { f.focus(); try { f.setSelectionRange(caret, caret); } catch {} } }
   }
@@ -285,7 +287,7 @@ td:first-child { width: 42%; }
     if (!state.topics.length) { $("#tree").textContent = "(add a topic to see this)"; return; }
     const groups = {};
     for (const t of state.topics) {
-      const d = destOf(t) || join("(the wizard will ask)", t.sub ?? t.label), cut = Math.max(d.lastIndexOf("\\"), d.lastIndexOf("/"));
+      const d = destOf(t) || join("(the wizard will ask)", t.sub ?? folderName(t.label)), cut = Math.max(d.lastIndexOf("\\"), d.lastIndexOf("/"));
       (groups[d.slice(0, cut) || d] ||= []).push(d.slice(cut + 1) + "   ← " + t.label);
     }
     $("#tree").textContent = Object.entries(groups).map(([root, kids]) =>
