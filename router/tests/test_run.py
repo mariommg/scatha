@@ -93,3 +93,57 @@ def test_failed_notes_stay_out_of_the_ledger(fake):
     assert run.main([]) == 1
     assert "status/1 " in ledger(fake) and "status/2" not in ledger(fake)
     assert "1 failed" in fake.pings[-1]
+
+
+# ----- the run lock: one run at a time (review #3) -----
+
+RACER = """
+import pathlib, sys, time
+from jev_router.run import take_lock
+lock, start, me = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), sys.argv[3]
+(start.parent / f"ready-{me}").touch()
+while not start.exists():
+    pass
+print("won" if take_lock(lock) else "lost", flush=True)
+time.sleep(1)  # hold it while the others try
+"""
+
+
+def test_only_one_of_many_simultaneous_runs_gets_the_lock(tmp_path):
+    import subprocess, sys, time
+    lock, start, n = tmp_path / ".run.lock", tmp_path / "start", 12
+    procs = [subprocess.Popen([sys.executable, "-c", RACER, str(lock), str(start), str(i)],
+                              stdout=subprocess.PIPE, text=True) for i in range(n)]
+    deadline = time.time() + 60
+    while len(list(tmp_path.glob("ready-*"))) < n and time.time() < deadline:
+        time.sleep(0.05)
+    start.touch()  # everyone goes at once
+    results = [p.communicate(timeout=60)[0].strip() for p in procs]
+    assert results.count("won") == 1, results
+
+
+def test_a_run_never_removes_another_runs_lock(tmp_path):
+    lock = tmp_path / ".run.lock"
+    mine = run.take_lock(lock)
+    run.release_lock(lock, "someone else's token")
+    assert lock.exists() and run.take_lock(lock) is None
+    run.release_lock(lock, mine)
+    assert not lock.exists()
+
+
+def test_a_stale_lock_is_taken_over(tmp_path):
+    import os, time
+    lock = tmp_path / ".run.lock"
+    lock.write_text("12345 long gone", encoding="utf-8")
+    old = time.time() - 7 * 3600
+    os.utime(lock, (old, old))
+    assert run.take_lock(lock) is not None
+
+
+def test_a_locked_run_exits_without_fetching(fake):
+    (fake.home / "work").mkdir(exist_ok=True)
+    held = run.take_lock(fake.home / "work" / ".run.lock")
+    fake.prepared = [bookmark(1)]
+    assert run.main([]) == 0
+    assert ledger(fake) == "" and not fake.pings  # nothing fetched, nothing reported
+    assert (fake.home / "work" / ".run.lock").read_text(encoding="utf-8") == held  # and the holder's lock survives

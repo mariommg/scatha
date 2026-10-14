@@ -68,6 +68,43 @@ def smaug_env(cfg: dict) -> dict:
     }
 
 
+LOCK_STALE = dt.timedelta(hours=6)
+
+
+def take_lock(lock) -> str | None:
+    """This run's token if it may go ahead, None if another run holds the lock.
+
+    Creating the file is the test: the OS lets exactly one O_EXCL create succeed, so runs that
+    start in the same instant can't both get in. A lock older than LOCK_STALE belongs to a run
+    that died; it is removed and the create tried once more."""
+    token = f"{os.getpid()} {dt.datetime.now().isoformat()}"
+    for _ in range(2):
+        try:
+            fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            try:
+                age = dt.datetime.now() - dt.datetime.fromtimestamp(lock.stat().st_mtime)
+            except FileNotFoundError:
+                continue  # its holder just finished
+            if age < LOCK_STALE:
+                return None
+            lock.unlink(missing_ok=True)
+            continue
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(token)
+        return token
+    return None
+
+
+def release_lock(lock, token: str) -> None:
+    """Remove the lock only if it is still this run's."""
+    try:
+        if lock.read_text(encoding="utf-8") == token:
+            lock.unlink()
+    except FileNotFoundError:
+        pass
+
+
 def append_ledger(lines: list[str]) -> None:
     ledger = app.work() / "ingested.md"
     if not ledger.exists():
@@ -117,10 +154,10 @@ def main(argv: list[str] | None = None) -> int:
             log(f"last run was {since.days} days ago; cadence wants {min_days}+. Skipping.")
             return 0
 
-    if lock.exists() and dt.datetime.now() - dt.datetime.fromtimestamp(lock.stat().st_mtime) < dt.timedelta(hours=6):
+    token = take_lock(lock)
+    if token is None:
         log("another run holds the lock; exiting")
         return 0
-    lock.write_text(f"{os.getpid()} {dt.datetime.now().isoformat()}", encoding="utf-8")
     try:
         tax_path = app.taxonomy_path(cfg)
         tax = Taxonomy.load(tax_path)
@@ -190,7 +227,7 @@ def main(argv: list[str] | None = None) -> int:
         log(f"note-writer tokens this run: {summary['tokens']:,}")
         return 1 if failed else 0
     finally:
-        lock.unlink(missing_ok=True)
+        release_lock(lock, token)
 
 
 if __name__ == "__main__":
