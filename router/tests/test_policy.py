@@ -48,3 +48,13 @@ def test_placed_in_strongest_topic():
     for topics in grid():
         _, placed = decide(TAX, topics)
         assert topics[placed] == max(topics.values())
+
+
+def test_also_line_defaults_to_the_keep_line(tmp_path):
+    from jev_router import Taxonomy
+    base = ("model: m\ntopics:\n  ai:\n    question: q\n    yes_means: y\n    no_means: n\n"
+            "thresholds:\n  route: 0.3\n  review: 0.3\n")
+    (tmp_path / "a.yaml").write_text(base, encoding="utf-8")
+    (tmp_path / "b.yaml").write_text(base + "  also: 0.5\n", encoding="utf-8")
+    assert Taxonomy.load(tmp_path / "a.yaml").also == 0.3
+    assert Taxonomy.load(tmp_path / "b.yaml").also == 0.5

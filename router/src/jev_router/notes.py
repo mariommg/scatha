@@ -382,8 +382,36 @@ def the_repo(names: list[str], vitals: dict) -> dict | None:
     return vitals.get(names[0]) if len(owners) == 1 else None
 
 
-def render(b: dict, r: dict, note: dict, words: int, vitals: dict | None = None) -> str:
-    """vitals: repo vital signs by 'owner/repo' (github.vitals)."""
+def topic_lines(primary: str, scores: dict[str, float], line: float) -> list[str]:
+    """Front matter for fuzzy edges: every topic at or above the line (the folder's topic first), and every score.
+
+    A bookmark is often about more than one topic; the folder holds one, these properties let
+    search and Bases find it under the others. Scores are text ("ai 0.84") so they read cleanly
+    in Obsidian's property panel.
+    """
+    ranked = sorted(scores, key=lambda k: (-scores[k], k))
+    above = [primary] + [k for k in ranked if k != primary and scores[k] >= line]
+    return ["topics: [" + ", ".join(above) + "]",
+            "topic_scores: [" + ", ".join(f'"{k} {scores[k]:.2f}"' for k in ranked) + "]"]
+
+
+TOPIC_PROPS = re.compile(r"^(topics|topic_scores):.*\n", re.M)
+
+
+def set_topic_lines(text: str, primary: str, scores: dict[str, float], line: float) -> str:
+    """Put topic_lines into a note's front matter, replacing any earlier ones (after bucket_score when present)."""
+    m = re.match(r"---\n(.*?\n)---\n", text, re.S)
+    if not m:
+        return text
+    fm = TOPIC_PROPS.sub("", m.group(1))
+    new = "\n".join(topic_lines(primary, scores, line)) + "\n"
+    at = re.search(r"^bucket_score:.*\n", fm, re.M)
+    fm = fm[:at.end()] + new + fm[at.end():] if at else fm + new
+    return "---\n" + fm + "---\n" + text[m.end():]
+
+
+def render(b: dict, r: dict, note: dict, words: int, vitals: dict | None = None, line: float = 0.3) -> str:
+    """vitals: repo vital signs by 'owner/repo' (github.vitals). line: the taxonomy's keep threshold."""
     vitals = vitals or {}
     created = dt.datetime.strptime(b["createdAt"], "%a %b %d %H:%M:%S %z %Y").date().isoformat() if b.get("createdAt") else ""
     tags = list(dict.fromkeys(note["tags"]))
@@ -406,6 +434,7 @@ def render(b: dict, r: dict, note: dict, words: int, vitals: dict | None = None)
         f"captured: {dt.date.today().isoformat()}",
         f"bucket: {r['primary']}",
         f"bucket_score: {r['topics'][r['primary']]:.2f}",
+        *topic_lines(r["primary"], r["topics"], line),
         "tags: [" + ", ".join(tags) + "]",
         f"words: {words}",
     ]
@@ -575,7 +604,7 @@ def cmd_write(args) -> dict:
                 path = folder / f"{name} (@{b['author']}).md"
             lookup_vitals(repos_in(b), repo_cache)
             vitals = {n: v for n, v in repo_cache.items() if v}
-            path.write_text(render(b, r, note, words, vitals), encoding="utf-8")
+            path.write_text(render(b, r, note, words, vitals, tax.also), encoding="utf-8")
             tokens += (usage.get("input_tokens") or 0) + (usage.get("output_tokens") or 0)
             written.append((r["item_id"], r["primary"], str(path)))
             print(f"  {r['primary']:17} {path.name}")
@@ -616,6 +645,52 @@ def cmd_backfill(args) -> None:
     print(f"full text {verb} {len(added)} notes; {has} already had it; {empty} have nothing beyond the post; "
           f"{unknown} notes have no raw bookmark in the given files")
     for f in added[:args.show]:
+        print(f"  {f}")
+
+
+def load_scores(paths: list[str]) -> dict[str, dict[str, float]]:
+    """Scores by bookmark id from routes.json files (a run's) or a sorting-desk deck.json; later files win."""
+    out = {}
+    for p in paths:
+        data = json.loads(Path(p).read_text(encoding="utf-8"))
+        rows = data["items"] if isinstance(data, dict) else data
+        for r in rows:
+            scores = r.get("scores") or r.get("topics")
+            if scores:
+                out[str(r.get("item_id") or r.get("id"))] = scores
+    return out
+
+
+def cmd_topics(args) -> None:
+    """Add every topic at or above the line, and every score, to notes written before they carried them.
+    No LLM, no fetch; reruns replace the lines, so it's safe to repeat after a rescore."""
+    tax = Taxonomy.load(args.taxonomy)
+    keys = {t.key for t in tax.topics}
+    scores = load_scores(args.scores)
+    changed, same, unknown, multi = [], 0, 0, 0
+    for folder in args.notes:
+        for f in sorted(Path(folder).rglob("*.md")):
+            text = f.read_text(encoding="utf-8")
+            m = re.search(r'^tweet_id: "(\d+)"', text, re.M)
+            bucket = re.search(r"^bucket: (\w+)", text, re.M)
+            if not m or not bucket:
+                continue
+            s = {k: v for k, v in (scores.get(m.group(1)) or {}).items() if k in keys}
+            if not s or bucket.group(1) not in keys:
+                unknown += 1
+                continue
+            new = set_topic_lines(text, bucket.group(1), s, tax.also)
+            multi += sum(1 for k, v in s.items() if v >= tax.also and k != bucket.group(1)) > 0
+            if new == text:
+                same += 1
+                continue
+            changed.append(f)
+            if args.apply:
+                f.write_text(new, encoding="utf-8")
+    verb = "updated" if args.apply else "would be updated (dry run; pass --apply)"
+    print(f"topics {verb} in {len(changed)} notes; {same} already current; {unknown} without scores; "
+          f"{multi} fit more than one topic")
+    for f in changed[:args.show]:
         print(f"  {f}")
 
 
@@ -709,13 +784,19 @@ def main() -> None:
     f.add_argument("--ids", nargs="*")
     f.add_argument("--apply", action="store_true")
     f.add_argument("--show", type=int, default=5)
+    t = sub.add_parser("topics")
+    t.add_argument("--scores", nargs="+", required=True, help="routes.json or deck.json files; later ones win")
+    t.add_argument("--notes", nargs="+", required=True)
+    t.add_argument("--taxonomy", required=True)
+    t.add_argument("--apply", action="store_true")
+    t.add_argument("--show", type=int, default=5)
     v = sub.add_parser("repo-vitals")
     v.add_argument("--notes", nargs="+", required=True)
     v.add_argument("--apply", action="store_true")
     v.add_argument("--show", type=int, default=5)
     args = ap.parse_args()
     {"describe": cmd_describe, "write": cmd_write, "backfill": cmd_backfill,
-     "repo-vitals": cmd_repo_vitals}[args.cmd](args)
+     "repo-vitals": cmd_repo_vitals, "topics": cmd_topics}[args.cmd](args)
 
 
 if __name__ == "__main__":

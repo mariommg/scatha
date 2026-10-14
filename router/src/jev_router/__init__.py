@@ -34,6 +34,11 @@ class Taxonomy:
     route_at: float  # primary topic at or above this -> route
     review_at: float  # best topic at or above this (but below route_at) -> review
     model: str | None = None
+    also_at: float | None = None  # other topics at or above this are listed on the note too; default: route_at
+
+    @property
+    def also(self) -> float:
+        return self.route_at if self.also_at is None else self.also_at
 
     @classmethod
     def load(cls, path: str | Path) -> Taxonomy:
@@ -46,6 +51,7 @@ class Taxonomy:
             route_at=raw["thresholds"]["route"],
             review_at=raw["thresholds"]["review"],
             model=raw.get("model"),
+            also_at=raw["thresholds"].get("also"),
         )
 
     def questions(self) -> dict:

@@ -91,7 +91,9 @@ The log lands in `~/.scatha/work/logs/` either way.
 
 On Windows the secrets are user environment variables: `TWITTER_AUTH_TOKEN`, `TWITTER_CT0`, `TYPESAFE_API_KEY`, and `ANTHROPIC_API_KEY` if you use the API.
 
-Each note's front matter carries `source`, `tweet_id`, `author`, `posted`, `captured`, `bucket`, `bucket_score`, `tags`, and `words`, so Obsidian's Properties and Bases can sort and filter them.
+Each note's front matter carries `source`, `tweet_id`, `author`, `posted`, `captured`, `bucket`, `bucket_score`, `topics`, `topic_scores`, `tags`, and `words`, so Obsidian's Properties and Bases can sort and filter them.
+
+A bookmark is often about more than one of your topics, and the line between two topics is rarely sharp. The folder holds the strongest one; `topics` lists every topic Jev scored at or above the keep line (the folder's topic first), so a Bases view or search for a topic also finds notes filed elsewhere. `topic_scores` shows every score, strongest first. To list fewer extra topics, add `also: 0.5` (or any number) under `thresholds` in `topics.yaml`. Notes written before these properties existed, or after you change topics, catch up with `uv run --project router python -m jev_router.notes topics --scores <routes.json or tuning/desk/deck.json> --taxonomy <topics.yaml> --notes <folder> ... [--apply]` (no model calls; dry run without `--apply`; safe to repeat).
 
 A note that links a GitHub repo also carries that repo's vital signs: `repo`, `repo_stars`, `repo_pushed`, `repo_archived`, `repo_last_release` (when it has releases), and `repo_checked`, the date they were true. Each repo's line under Links shows its own stars and last push. The front matter gets them only when the linked repos share one owner (one project, maybe in parts; the first repo stands for it); a list of repos from several owners isn't about any one of them, so it gets none. Old notes can catch up with `uv run --project router python -m jev_router.notes repo-vitals --notes <folder> ... [--apply]` (dry run without `--apply`; safe to repeat). GitHub allows 60 lookups an hour without a token, two per repo; set `GITHUB_TOKEN` for more.
 

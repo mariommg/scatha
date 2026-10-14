@@ -284,3 +284,65 @@ def test_quote_sources_cover_everything_haiku_was_shown():
                                {"quote": "Install it with pip.", "from": "linked"}], src)
     assert len(kept) == 2
     assert quote_sources(b, translated=True)["post"] == ""  # a translated post can't be quoted
+
+
+# ---------- every topic Jev scored, visible in the vault ----------
+
+def test_topic_lines_folder_topic_first_then_others_above_the_line():
+    from jev_router.notes import topic_lines
+    scores = {"ai": 0.84, "knowledge_work": 0.86, "life_hackery": 0.31, "journalism": 0.05}
+    topics, shown = topic_lines("ai", scores, 0.3)
+    # the folder's topic leads even when another scored higher (notes filed under older definitions)
+    assert topics == "topics: [ai, knowledge_work, life_hackery]"
+    assert shown == 'topic_scores: ["knowledge_work 0.86", "ai 0.84", "life_hackery 0.31", "journalism 0.05"]'
+    assert topic_lines("ai", {"ai": 0.9, "journalism": 0.29}, 0.3)[0] == "topics: [ai]"
+
+
+def test_new_notes_carry_topics_and_scores():
+    from jev_router.notes import render
+    b = {"id": "9", "text": "t", "author": "x", "tweetUrl": "https://x.com/x/status/9", "links": []}
+    note = {"title": "T", "summary": "s", "tags": [], "key_points": ["k"], "howto": None}
+    text = render(b, {"primary": "ai", "topics": {"ai": 0.9, "knowledge_work": 0.5}}, note, 10, line=0.3)
+    fm = text.split("---")[1]
+    assert "topics: [ai, knowledge_work]" in fm and 'topic_scores: ["ai 0.90", "knowledge_work 0.50"]' in fm
+    assert fm.index("bucket_score:") < fm.index("topics:")
+
+
+NOTE = '---\ntitle: "T"\ntweet_id: "9"\nbucket: ai\nbucket_score: 0.90\ntags: [x]\n---\n\n# T\n\ntopics: not front matter\n'
+
+
+def test_set_topic_lines_replaces_and_repeats_cleanly():
+    from jev_router.notes import set_topic_lines
+    once = set_topic_lines(NOTE, "ai", {"ai": 0.9, "knowledge_work": 0.4}, 0.3)
+    assert once.count("topics: [") == 1 and once.endswith("# T\n\ntopics: not front matter\n")
+    assert once.index("bucket_score:") < once.index("topics: [ai, knowledge_work]") < once.index("tags: [x]")
+    assert set_topic_lines(once, "ai", {"ai": 0.9, "knowledge_work": 0.4}, 0.3) == once
+    again = set_topic_lines(once, "ai", {"ai": 0.9, "knowledge_work": 0.2}, 0.3)
+    assert "topics: [ai]\n" in again and again.count("topic_scores:") == 1
+    bare = '---\ntweet_id: "9"\nbucket: ai\n---\nbody\n'
+    assert set_topic_lines(bare, "ai", {"ai": 0.9}, 0.3).startswith('---\ntweet_id: "9"\nbucket: ai\ntopics: [ai]\n')
+    assert set_topic_lines("no front matter\n", "ai", {"ai": 0.9}, 0.3) == "no front matter\n"
+
+
+def test_topics_backfill_dry_run_then_apply(tmp_path, capsys):
+    import json
+    from types import SimpleNamespace
+    from jev_router import topics
+    from jev_router.notes import cmd_topics
+    topics.write_taxonomy([{"label": n, "destination": str(tmp_path / n), **{k: topics.PRESETS[n][k] for k in ("question", "yes_means", "no_means")}}
+                           for n in ("AI", "Knowledge work")],
+                          tmp_path / "t.yaml")
+    vault = tmp_path / "v"
+    vault.mkdir()
+    (vault / "a.md").write_text(NOTE, encoding="utf-8")
+    (vault / "plain.md").write_text("# not a scatha note\n", encoding="utf-8")
+    deck = tmp_path / "deck.json"
+    deck.write_text(json.dumps({"items": [{"id": "9", "scores": {"ai": 0.9, "knowledge_work": 0.7, "gone_topic": 0.8}}]}), encoding="utf-8")
+    args = SimpleNamespace(scores=[str(deck)], notes=[str(vault)], taxonomy=str(tmp_path / "t.yaml"), apply=False, show=0)
+    cmd_topics(args)
+    assert (vault / "a.md").read_text(encoding="utf-8") == NOTE
+    cmd_topics(SimpleNamespace(**vars(args) | {"apply": True}))
+    text = (vault / "a.md").read_text(encoding="utf-8")
+    assert "topics: [ai, knowledge_work]" in text and "gone_topic" not in text
+    cmd_topics(SimpleNamespace(**vars(args) | {"apply": True}))
+    assert "0 notes; 1 already current" in capsys.readouterr().out.splitlines()[-1]
