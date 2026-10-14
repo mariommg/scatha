@@ -541,6 +541,21 @@ function metaContent(document, ...keys) {
   return null;
 }
 
+const BLOCKS = 'p, div, section, article, header, footer, aside, main, nav, h1, h2, h3, h4, h5, h6, ' +
+  'li, ul, ol, dl, dt, dd, pre, blockquote, figure, figcaption, table, tr, hr, details, summary';
+
+/**
+ * The text of an HTML fragment with a blank line after every block element and a line
+ * break for every <br>. textContent alone joins blocks with nothing between them, so a
+ * paragraph after a code block or heading ran into it ("...NA" + "The" -> "NAThe").
+ */
+function blockText(html) {
+  const { document } = parseHTML(`<!doctype html><html><body>${html}</body></html>`);
+  for (const br of document.querySelectorAll('br')) br.replaceWith(document.createTextNode('\n'));
+  for (const el of document.querySelectorAll(BLOCKS)) el.appendChild(document.createTextNode('\n\n'));
+  return document.body.textContent;
+}
+
 /**
  * HTML -> readable article (Firefox Reader View's algorithm), plus the page's
  * public title and summary, which survive even when the body is paywalled.
@@ -552,7 +567,8 @@ export function extractReadable(html) {
   let text = null, byline = null;
   try {
     const article = new Readability(document).parse();
-    text = article?.textContent?.replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n\n').trim() || null;
+    const raw = article?.content ? blockText(article.content) : article?.textContent;
+    text = raw?.replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n\n').trim() || null;
     byline = article?.byline || null;
   } catch {}
   return { title, description, byline, text };

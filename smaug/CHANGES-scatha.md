@@ -65,5 +65,10 @@ used; the router in `../router` sorts and writes notes instead.
   `fetchXArticleContent`) into six exported functions; the tests that copied that
   logic now call them. Byte-identical output on live bookmarks. Five fixture-only
   tests and their fixtures removed.
+- **Paragraphs stay apart in article text.** Readability's `textContent` joins block
+  elements with nothing between them ("...NA" + "The" -> "NAThe"). Article text now
+  comes from Readability's HTML with a blank line after each block element and a line
+  break for each `<br>`. On six live pages, glued joins fell from 218 to 44 (most of
+  the rest are camelCase in code samples), with no text lost.
 - **Sample data removed.** The upstream author's own `bookmarks.md` and `knowledge/`
   examples are not included.

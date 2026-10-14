@@ -1,7 +1,7 @@
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
 import {
-  isPaywalled, stripQuerystring, fetchXArticleContent, fetchBookmarks,
+  isPaywalled, stripQuerystring, fetchXArticleContent, fetchBookmarks, extractReadable,
   xArticleId, linkType, pickXArticle, wantsDirectArticle, directArticleUrl, tcoLinksOf,
 } from '../src/processor.js';
 import { loadConfig } from '../src/config.js';
@@ -143,6 +143,41 @@ describe('X article detection logic', () => {
   test('carries the ids and source through', () => {
     assert.deepStrictEqual(pick({ text: 'x', article: { title: 'T' } }),
       { articleId: '9', title: 'T', previewText: null, content: 'x', url: 'https://x.com/i/article/9', source: 's', sourceTweetId: '1' });
+  });
+});
+
+describe('extractReadable paragraph breaks', () => {
+  // Readability's textContent joins blocks with nothing between them: "...NA" + "The overarching"
+  // came out as "NAThe overarching" (2026-10-14, the clock R package post), which cost a real quote.
+  const filler = 'This sentence pads the article so Readability treats it as the main content. '.repeat(6);
+  const page = (body) => `<html><head><title>T</title></head><body><article><h1>Heading One</h1>${body}</article></body></html>`;
+
+  test('a paragraph after a code block starts on its own', () => {
+    const { text } = extractReadable(page(`<p>${filler}</p><pre>date5\n NA</pre><p>The overarching goal of clock is to protect you.</p><p>${filler}</p>`));
+    assert.match(text, /NA\n+The overarching goal/);
+    assert.doesNotMatch(text, /NAThe/);
+  });
+
+  test('headings, paragraphs, and list items are separated', () => {
+    const { text } = extractReadable(page(`<p>${filler}</p><h2>Results</h2><p>First point.</p><ul><li>one</li><li>two</li></ul><p>Last. ${filler}</p>`));
+    assert.match(text, /Results\n+First point\./);
+    assert.match(text, /one\n+two/);
+    assert.doesNotMatch(text, /ResultsFirst|onetwo|point\.one/);
+  });
+
+  test('line breaks inside a paragraph survive as line breaks', () => {
+    const { text } = extractReadable(page(`<p>${filler}</p><p>Roses are red,<br>violets are blue.</p><p>${filler}</p>`));
+    assert.match(text, /red,\nviolets/);
+  });
+
+  test('inline elements do not get breaks', () => {
+    const { text } = extractReadable(page(`<p>${filler}</p><p>Use <code>add_months()</code> with <em>care</em> here.</p><p>${filler}</p>`));
+    assert.match(text, /Use add_months\(\) with care here\./);
+  });
+
+  test('no runs of more than one blank line', () => {
+    const { text } = extractReadable(page(`<div><div><p>${filler}</p></div></div><section><p>Next.</p></section>`));
+    assert.doesNotMatch(text, /\n\s*\n\s*\n/);
   });
 });
 
