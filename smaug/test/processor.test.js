@@ -1,13 +1,11 @@
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { isPaywalled, stripQuerystring, fetchXArticleContent, fetchBookmarks } from '../src/processor.js';
+import {
+  isPaywalled, stripQuerystring, fetchXArticleContent, fetchBookmarks,
+  xArticleId, linkType, pickXArticle, wantsDirectArticle, directArticleUrl, tcoLinksOf,
+} from '../src/processor.js';
 import { loadConfig } from '../src/config.js';
 import { x } from '../src/x.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Live tests run only when X accepts the cookies in the environment
 async function hasXCredentials() {
@@ -22,31 +20,26 @@ async function hasXCredentials() {
 const X_AVAILABLE = await hasXCredentials();
 
 describe('X article URL detection', () => {
-  test('detects X article URL pattern', () => {
-    const url = 'https://x.com/i/article/2015364734262935552';
-    assert.ok(url.includes('/i/article/'), 'should match X article pattern');
+  test('pulls the article ID out of an X article URL', () => {
+    assert.strictEqual(xArticleId('https://x.com/i/article/2015364734262935552'), '2015364734262935552');
   });
 
-  test('extracts article ID from X article URL', () => {
-    const url = 'https://x.com/i/article/2015364734262935552';
-    const match = url.match(/\/i\/article\/(\d+)/);
-    assert.ok(match, 'should match article ID pattern');
-    assert.strictEqual(match[1], '2015364734262935552');
+  test('regular tweet URLs have no article ID', () => {
+    assert.strictEqual(xArticleId('https://x.com/user/status/123456789'), null);
   });
 
-  test('X article URL is not matched by generic tweet check', () => {
-    const url = 'https://x.com/i/article/2015364734262935552';
-    // The /i/article/ check should come BEFORE the generic x.com check
-    const isXArticle = url.includes('/i/article/');
-    const isTweet = url.includes('x.com') && !isXArticle;
-    assert.ok(isXArticle, 'should be detected as X article');
-    assert.ok(!isTweet, 'should not be detected as generic tweet');
+  test('an X article URL is an article, not a tweet', () => {
+    assert.strictEqual(linkType('https://x.com/i/article/2015364734262935552'), 'x-article');
+    assert.strictEqual(linkType('https://x.com/user/status/123456789'), 'tweet');
   });
 
-  test('regular tweet URLs are not detected as X articles', () => {
-    const url = 'https://x.com/user/status/123456789';
-    const isXArticle = url.includes('/i/article/');
-    assert.ok(!isXArticle, 'regular tweets should not match X article pattern');
+  test('other link types', () => {
+    assert.strictEqual(linkType('https://github.com/a/b'), 'github');
+    assert.strictEqual(linkType('https://youtu.be/abc'), 'video');
+    assert.strictEqual(linkType('https://www.youtube.com/watch?v=abc'), 'video');
+    assert.strictEqual(linkType('https://x.com/user/status/1/photo/1'), 'media');
+    assert.strictEqual(linkType('https://example.com/pic.PNG'), 'image');
+    assert.strictEqual(linkType('https://example.com/post'), 'article');
   });
 });
 
@@ -107,65 +100,35 @@ describe('fetchXArticleContent', () => {
 });
 
 describe('X article detection logic', () => {
-  // These tests verify the detection logic used in fetchXArticleContent
-  // to determine if bird CLI returned article content
+  // pickXArticle decides whether bird returned an article: metadata, or more than 500 characters
+  const pick = (tweetData) => pickXArticle(tweetData, { articleId: '9', articleUrl: 'https://x.com/i/article/9', source: 's', tweetId: '1' });
 
   test('detects article by metadata (title present)', () => {
-    const articleMeta = { title: 'My Article', previewText: null };
-    const articleContent = 'Short text'; // < 500 chars
-
-    const hasArticleMeta = articleMeta.title || articleMeta.previewText;
-    const hasArticleContent = articleContent.length > 500;
-
-    assert.ok(hasArticleMeta, 'should detect via title');
-    assert.ok(!hasArticleContent, 'content is short');
-    assert.ok(hasArticleMeta || hasArticleContent, 'should pass detection with metadata');
+    assert.strictEqual(pick({ text: 'Short text', article: { title: 'My Article' } }).title, 'My Article');
   });
 
   test('detects article by metadata (previewText present)', () => {
-    const articleMeta = { title: null, previewText: 'Preview of the article...' };
-    const articleContent = 'Short text'; // < 500 chars
-
-    const hasArticleMeta = articleMeta.title || articleMeta.previewText;
-    const hasArticleContent = articleContent.length > 500;
-
-    assert.ok(hasArticleMeta, 'should detect via previewText');
-    assert.ok(hasArticleMeta || hasArticleContent, 'should pass detection with previewText');
+    assert.strictEqual(pick({ text: 'Short text', article: { previewText: 'Preview...' } }).previewText, 'Preview...');
   });
 
   test('detects article by content length (no metadata)', () => {
-    const articleMeta = { title: null, previewText: null };
-    const articleContent = 'A'.repeat(600); // > 500 chars
+    const got = pick({ text: 'A'.repeat(600) });
+    assert.strictEqual(got.content.length, 600);
+    assert.strictEqual(got.title, null);
+  });
 
-    const hasArticleMeta = articleMeta.title || articleMeta.previewText;
-    const hasArticleContent = articleContent.length > 500;
-
-    assert.ok(!hasArticleMeta, 'no metadata');
-    assert.ok(hasArticleContent, 'should detect via content length');
-    assert.ok(hasArticleMeta || hasArticleContent, 'should pass detection with long content');
+  test('a 500-character post without metadata is not an article', () => {
+    assert.strictEqual(pick({ text: 'A'.repeat(500) }), null);
   });
 
   test('fails detection when no metadata and short content', () => {
-    const articleMeta = { title: null, previewText: null };
-    const articleContent = 'Just a regular tweet'; // < 500 chars
-
-    const hasArticleMeta = articleMeta.title || articleMeta.previewText;
-    const hasArticleContent = articleContent.length > 500;
-
-    assert.ok(!hasArticleMeta, 'no metadata');
-    assert.ok(!hasArticleContent, 'short content');
-    assert.ok(!(hasArticleMeta || hasArticleContent), 'should fail detection');
+    assert.strictEqual(pick({ text: 'Just a regular tweet' }), null);
+    assert.strictEqual(pick({ text: 'Short text', article: {} }), null);  // empty metadata object
   });
 
-  test('empty metadata object is handled correctly', () => {
-    const articleMeta = {};
-    const articleContent = 'Short text';
-
-    const hasArticleMeta = articleMeta.title || articleMeta.previewText;
-    const hasArticleContent = articleContent.length > 500;
-
-    assert.ok(!hasArticleMeta, 'empty object has no metadata');
-    assert.ok(!(hasArticleMeta || hasArticleContent), 'should fail detection');
+  test('carries the ids and source through', () => {
+    assert.deepStrictEqual(pick({ text: 'x', article: { title: 'T' } }),
+      { articleId: '9', title: 'T', previewText: null, content: 'x', url: 'https://x.com/i/article/9', source: 's', sourceTweetId: '1' });
   });
 });
 
@@ -232,297 +195,76 @@ describe('stripQuerystring', () => {
   });
 });
 
-describe('pending file handling', () => {
-  test('fixture file with bookmarks array loads correctly', () => {
-    const fixture = JSON.parse(
-      fs.readFileSync(path.join(__dirname, 'fixtures/pending-bookmarks.json'), 'utf8')
-    );
-    assert.ok(Array.isArray(fixture.bookmarks));
-    assert.strictEqual(fixture.bookmarks.length, 1);
-  });
-
-  test('fixture file without bookmarks array handled with fallback', () => {
-    const fixture = JSON.parse(
-      fs.readFileSync(path.join(__dirname, 'fixtures/empty-pending.json'), 'utf8')
-    );
-    // This tests the pattern: (fixture.bookmarks || [])
-    const bookmarks = fixture.bookmarks || [];
-    assert.ok(Array.isArray(bookmarks));
-    assert.strictEqual(bookmarks.length, 0);
-  });
-
-  test('null-safe bookmark ID extraction', () => {
-    const fixture = JSON.parse(
-      fs.readFileSync(path.join(__dirname, 'fixtures/empty-pending.json'), 'utf8')
-    );
-    // Pattern from processor.js line 394
-    const pendingIds = new Set((fixture.bookmarks || []).map(b => b.id.toString()));
-    assert.strictEqual(pendingIds.size, 0);
-  });
-});
-
-describe('sample bookmarks fixture', () => {
-  test('loads sample bookmarks', () => {
-    const bookmarks = JSON.parse(
-      fs.readFileSync(path.join(__dirname, 'fixtures/sample-bookmarks.json'), 'utf8')
-    );
-    assert.strictEqual(bookmarks.length, 2);
-    assert.strictEqual(bookmarks[0].author.username, 'testuser');
-  });
-
-  test('bookmarks have required fields', () => {
-    const bookmarks = JSON.parse(
-      fs.readFileSync(path.join(__dirname, 'fixtures/sample-bookmarks.json'), 'utf8')
-    );
-    for (const bookmark of bookmarks) {
-      assert.ok(bookmark.id, 'bookmark should have id');
-      assert.ok(bookmark.text, 'bookmark should have text');
-      assert.ok(bookmark.author, 'bookmark should have author');
-      assert.ok(bookmark.createdAt, 'bookmark should have createdAt');
-    }
-  });
-});
-
 describe('direct article metadata detection', () => {
-  // These tests verify the logic that detects X articles directly on
-  // bookmark.article or bookmark.quotedTweet.article when no t.co link
-  // contains the article URL
+  // Tweets can carry article metadata with no t.co link to expand
 
-  test('detects bookmark.article when present', () => {
-    const bookmark = {
-      id: '123456789',
-      text: 'Check out my article', // No t.co link
-      article: {
-        id: '987654321',
-        title: 'My Great Article',
-        previewText: 'This is a preview of my article...'
-      }
-    };
-
-    // Simulates the logic in processor.js
-    const links = []; // No X article found from t.co links
-    const hasDirectArticle = bookmark.article && !links.some(l => l.type === 'x-article');
-
-    assert.ok(hasDirectArticle, 'should detect direct article metadata');
-    assert.strictEqual(bookmark.article.title, 'My Great Article');
-  });
-
-  test('detects quotedTweet.article when present', () => {
-    const bookmark = {
-      id: '123456789',
-      text: 'Great article!', // No t.co link
-      quotedTweet: {
-        id: '555555555',
-        text: 'Original article tweet',
-        article: {
-          id: '666666666',
-          title: 'Quoted Article Title',
-          previewText: 'Preview of the quoted article'
-        }
-      }
-    };
-
-    // Simulates the logic in processor.js
-    const links = []; // No X article found from t.co links
-    const hasQuotedArticle = bookmark.quotedTweet?.article && !links.some(l => l.type === 'x-article');
-
-    assert.ok(hasQuotedArticle, 'should detect article on quoted tweet');
-    assert.strictEqual(bookmark.quotedTweet.article.title, 'Quoted Article Title');
+  test('wants a direct article when the tweet has metadata and no link found one', () => {
+    assert.strictEqual(wantsDirectArticle({ id: '987654321', title: 'My Great Article' }, []), true);
   });
 
   test('skips direct article when X article already found via t.co link', () => {
-    const bookmark = {
-      id: '123456789',
-      text: 'Article link: https://t.co/abc123',
-      article: {
-        id: '987654321',
-        title: 'My Great Article'
-      }
-    };
-
-    // Simulates links array after t.co processing found an article
-    const links = [
-      { original: 'https://t.co/abc123', expanded: 'https://x.com/i/article/999', type: 'x-article', content: {} }
-    ];
-    const hasDirectArticle = bookmark.article && !links.some(l => l.type === 'x-article');
-
-    assert.ok(!hasDirectArticle, 'should skip direct article when one already found');
+    const links = [{ original: 'https://t.co/abc123', expanded: 'https://x.com/i/article/999', type: 'x-article', content: {} }];
+    assert.strictEqual(wantsDirectArticle({ id: '987654321' }, links), false);
   });
 
-  test('generates correct article URL from bookmark.article.id', () => {
-    const articleMeta = { id: '123456789012345' };
-    const bookmarkId = '999999999';
-    const articleUrl = `https://x.com/i/article/${articleMeta.id || bookmarkId}`;
-
-    assert.strictEqual(articleUrl, 'https://x.com/i/article/123456789012345');
+  test('no metadata, nothing to fetch', () => {
+    assert.strictEqual(wantsDirectArticle(undefined, []), false);
+    assert.strictEqual(wantsDirectArticle(null, [{ type: 'article' }]), false);
   });
 
-  test('falls back to bookmark.id when article.id is missing', () => {
-    const articleMeta = { title: 'Article without ID' };
-    const bookmarkId = '888888888';
-    const articleUrl = `https://x.com/i/article/${articleMeta.id || bookmarkId}`;
+  test('generates correct article URL from the article id', () => {
+    assert.strictEqual(directArticleUrl({ id: '123456789012345' }, '999999999'), 'https://x.com/i/article/123456789012345');
+  });
 
-    assert.strictEqual(articleUrl, 'https://x.com/i/article/888888888');
+  test('falls back to the tweet id when article.id is missing', () => {
+    assert.strictEqual(directArticleUrl({ title: 'Article without ID' }, '888888888'), 'https://x.com/i/article/888888888');
   });
 
   test('extracts t.co links from quotedTweet.text', () => {
-    // Simulates the bookmarks API returning truncated quotedTweet
-    // where the article link is only in quotedTweet.text
-    const bookmark = {
-      id: '123456789',
-      text: '"Quote of the article content"', // No t.co link in main text
-      quotedTweet: {
-        id: '555555555',
-        text: 'https://t.co/abc123xyz', // t.co link only here
-        author: { username: 'original_author' }
-      }
-    };
-
-    // Simulates the logic in processor.js
-    const tcoLinks = bookmark.text.match(/https?:\/\/t\.co\/\w+/g) || [];
-    
-    // Check quotedTweet.text for additional links
-    if (bookmark.quotedTweet?.text) {
-      const quotedLinks = bookmark.quotedTweet.text.match(/https?:\/\/t\.co\/\w+/g) || [];
-      for (const link of quotedLinks) {
-        if (!tcoLinks.includes(link)) {
-          tcoLinks.push(link);
-        }
-      }
-    }
-
-    assert.strictEqual(tcoLinks.length, 1, 'should find link from quotedTweet.text');
-    assert.strictEqual(tcoLinks[0], 'https://t.co/abc123xyz');
+    // The bookmarks API truncates quoted tweets; the article link may be only there
+    assert.deepStrictEqual(tcoLinksOf('"Quote of the article content"', 'https://t.co/abc123xyz'), ['https://t.co/abc123xyz']);
   });
 
   test('deduplicates t.co links between text and quotedTweet.text', () => {
-    const bookmark = {
-      id: '123456789',
-      text: 'Check this out https://t.co/same123',
-      quotedTweet: {
-        id: '555555555',
-        text: 'Original: https://t.co/same123', // Same link
-        author: { username: 'original_author' }
-      }
-    };
+    assert.deepStrictEqual(tcoLinksOf('Check this out https://t.co/same123', 'Original: https://t.co/same123 https://t.co/other9'),
+      ['https://t.co/same123', 'https://t.co/other9']);
+  });
 
-    const tcoLinks = bookmark.text.match(/https?:\/\/t\.co\/\w+/g) || [];
-    
-    if (bookmark.quotedTweet?.text) {
-      const quotedLinks = bookmark.quotedTweet.text.match(/https?:\/\/t\.co\/\w+/g) || [];
-      for (const link of quotedLinks) {
-        if (!tcoLinks.includes(link)) {
-          tcoLinks.push(link);
-        }
-      }
-    }
-
-    assert.strictEqual(tcoLinks.length, 1, 'should deduplicate same link');
+  test('no text, no links', () => {
+    assert.deepStrictEqual(tcoLinksOf(undefined, undefined), []);
   });
 });
 
 describe('extractArticle content/metadata selection', () => {
-  // Tests for the extractArticle logic that chooses between main and quoted content
+  // pickXArticle chooses between the tweet and the tweet it quotes
+  const pick = (tweetData) => pickXArticle(tweetData, { articleId: '9', articleUrl: 'u', source: 's', tweetId: '1' });
 
   test('preserves main metadata when quoted has longer content but no metadata', () => {
-    // Simulates extractArticle logic
-    const tweetData = {
-      text: 'A'.repeat(500), // Main has 500 chars
-      article: { title: 'Main Title', previewText: 'Main preview' },
-      quotedTweet: {
-        id: '555',
-        text: 'B'.repeat(600), // Quoted has 600 chars but no metadata
-        article: {}
-      }
-    };
-
-    let articleContent = tweetData.text || '';
-    let articleMeta = tweetData.article || {};
-
-    const quotedTweet = tweetData.quotedTweet;
-    if (quotedTweet) {
-      const quotedContent = quotedTweet.text || '';
-      const quotedMeta = quotedTweet.article || {};
-      const quotedHasMeta = quotedMeta.title || quotedMeta.previewText;
-
-      if (quotedContent.length > articleContent.length) {
-        articleContent = quotedContent;
-        // Only switch metadata if quoted has it
-        if (quotedHasMeta) {
-          articleMeta = quotedMeta;
-        }
-      }
-    }
-
-    assert.strictEqual(articleContent.length, 600, 'should use longer quoted content');
-    assert.strictEqual(articleMeta.title, 'Main Title', 'should preserve main metadata');
+    const got = pick({ text: 'A'.repeat(500), article: { title: 'Main Title', previewText: 'Main preview' },
+      quotedTweet: { id: '555', text: 'B'.repeat(600), article: {} } });
+    assert.strictEqual(got.content.length, 600, 'should use longer quoted content');
+    assert.strictEqual(got.title, 'Main Title', 'should preserve main metadata');
+    assert.strictEqual(got.sourceTweetId, '555', 'content came from the quoted tweet');
   });
 
   test('uses quoted metadata when main has none', () => {
-    const tweetData = {
-      text: 'A'.repeat(1000),
-      article: {}, // No metadata
-      quotedTweet: {
-        id: '555',
-        text: 'B'.repeat(400), // Shorter but has metadata
-        article: { title: 'Quoted Title' }
-      }
-    };
+    const got = pick({ text: 'A'.repeat(1000), article: {}, quotedTweet: { id: '555', text: 'B'.repeat(400), article: { title: 'Quoted Title' } } });
+    assert.strictEqual(got.content.length, 1000, 'should keep longer main content');
+    assert.strictEqual(got.title, 'Quoted Title', 'should use quoted metadata');
+    assert.strictEqual(got.sourceTweetId, '1');
+  });
 
-    let articleContent = tweetData.text || '';
-    let articleMeta = tweetData.article || {};
-
-    const quotedTweet = tweetData.quotedTweet;
-    if (quotedTweet) {
-      const quotedContent = quotedTweet.text || '';
-      const quotedMeta = quotedTweet.article || {};
-      const mainHasMeta = articleMeta.title || articleMeta.previewText;
-      const quotedHasMeta = quotedMeta.title || quotedMeta.previewText;
-
-      if (quotedContent.length > articleContent.length) {
-        articleContent = quotedContent;
-        if (quotedHasMeta) {
-          articleMeta = quotedMeta;
-        }
-      } else if (quotedHasMeta && !mainHasMeta) {
-        articleMeta = quotedMeta;
-      }
-    }
-
-    assert.strictEqual(articleContent.length, 1000, 'should keep longer main content');
-    assert.strictEqual(articleMeta.title, 'Quoted Title', 'should use quoted metadata');
+  test('takes the quoted text too when it is long and the main has no metadata', () => {
+    const got = pick({ text: 'A'.repeat(700), quotedTweet: { id: '555', text: 'B'.repeat(600), article: { title: 'Quoted Title' } } });
+    assert.strictEqual(got.content, 'B'.repeat(600));
+    assert.strictEqual(got.sourceTweetId, '555');
   });
 
   test('uses both quoted content and metadata when quoted is longer and has metadata', () => {
-    const tweetData = {
-      text: 'A'.repeat(500),
-      article: { title: 'Main Title' },
-      quotedTweet: {
-        id: '555',
-        text: 'B'.repeat(13000),
-        article: { title: 'Quoted Title', previewText: 'Quoted preview' }
-      }
-    };
-
-    let articleContent = tweetData.text || '';
-    let articleMeta = tweetData.article || {};
-
-    const quotedTweet = tweetData.quotedTweet;
-    if (quotedTweet) {
-      const quotedContent = quotedTweet.text || '';
-      const quotedMeta = quotedTweet.article || {};
-      const quotedHasMeta = quotedMeta.title || quotedMeta.previewText;
-
-      if (quotedContent.length > articleContent.length) {
-        articleContent = quotedContent;
-        if (quotedHasMeta) {
-          articleMeta = quotedMeta;
-        }
-      }
-    }
-
-    assert.strictEqual(articleContent.length, 13000, 'should use longer quoted content');
-    assert.strictEqual(articleMeta.title, 'Quoted Title', 'should use quoted metadata');
+    const got = pick({ text: 'A'.repeat(500), article: { title: 'Main Title' },
+      quotedTweet: { id: '555', text: 'B'.repeat(13000), article: { title: 'Quoted Title', previewText: 'Quoted preview' } } });
+    assert.strictEqual(got.content.length, 13000, 'should use longer quoted content');
+    assert.strictEqual(got.title, 'Quoted Title', 'should use quoted metadata');
   });
 });
 

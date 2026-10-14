@@ -55,60 +55,71 @@ async function searchForArticleTweet(articleId, config) {
  * Direct HTTP fetch won't work - X articles are JS-rendered SPAs that require
  * the Twitter API (via bird CLI) to get the actual content.
  */
+/** The article ID in an X article URL (x.com/i/article/<id>), or null. */
+export function xArticleId(url) {
+  return url.match(/\/i\/article\/(\d+)/)?.[1] ?? null;
+}
+
+/**
+ * The X article in a tweet's data, or null if it doesn't hold one. When someone quotes an
+ * article, the full text is in quotedTweet, so the longer text wins; metadata (title,
+ * previewText) is kept from whichever side has it. Counts as an article with metadata, or
+ * with more than 500 characters of text.
+ */
+export function pickXArticle(tweetData, { articleId, articleUrl, source, tweetId }) {
+  let articleContent = tweetData.text || '';
+  let articleMeta = tweetData.article || {};
+  let actualTweetId = tweetId;
+
+  const quotedTweet = tweetData.quotedTweet;
+  if (quotedTweet) {
+    const quotedContent = quotedTweet.text || '';
+    const quotedMeta = quotedTweet.article || {};
+
+    const mainHasMeta = articleMeta.title || articleMeta.previewText;
+    const quotedHasMeta = quotedMeta.title || quotedMeta.previewText;
+
+    if (quotedContent.length > articleContent.length) {
+      articleContent = quotedContent;
+      actualTweetId = quotedTweet.id || tweetId;
+      // Only switch metadata if quoted has it (preserve main's metadata otherwise)
+      if (quotedHasMeta) {
+        articleMeta = quotedMeta;
+      }
+    } else if (quotedHasMeta && !mainHasMeta) {
+      articleMeta = quotedMeta;
+      if (quotedContent.length > 500) {
+        articleContent = quotedContent;
+        actualTweetId = quotedTweet.id || tweetId;
+      }
+    }
+  }
+
+  const hasArticleMeta = articleMeta.title || articleMeta.previewText;
+  const hasArticleContent = articleContent.length > 500;
+
+  if (hasArticleMeta || hasArticleContent) {
+    return {
+      articleId,
+      title: articleMeta.title || null,
+      previewText: articleMeta.previewText || null,
+      content: articleContent,
+      url: articleUrl,
+      source,
+      sourceTweetId: actualTweetId
+    };
+  }
+  return null;
+}
+
 export async function fetchXArticleContent(articleUrl, config, sourceTweetId = null) {
-  const articleIdMatch = articleUrl.match(/\/i\/article\/(\d+)/);
-  if (!articleIdMatch) {
+  const articleId = xArticleId(articleUrl);
+  if (!articleId) {
     return { error: 'Could not parse X article URL', source: 'x-article' };
   }
 
-  const articleId = articleIdMatch[1];
-
-  const extractArticle = (tweetData, source, tweetId) => {
-    let articleContent = tweetData.text || '';
-    let articleMeta = tweetData.article || {};
-    let actualTweetId = tweetId;
-
-    // When someone quotes an X article, the full content is in quotedTweet, not main text
-    const quotedTweet = tweetData.quotedTweet;
-    if (quotedTweet) {
-      const quotedContent = quotedTweet.text || '';
-      const quotedMeta = quotedTweet.article || {};
-      
-      const mainHasMeta = articleMeta.title || articleMeta.previewText;
-      const quotedHasMeta = quotedMeta.title || quotedMeta.previewText;
-      
-      if (quotedContent.length > articleContent.length) {
-        articleContent = quotedContent;
-        actualTweetId = quotedTweet.id || tweetId;
-        // Only switch metadata if quoted has it (preserve main's metadata otherwise)
-        if (quotedHasMeta) {
-          articleMeta = quotedMeta;
-        }
-      } else if (quotedHasMeta && !mainHasMeta) {
-        articleMeta = quotedMeta;
-        if (quotedContent.length > 500) {
-          articleContent = quotedContent;
-          actualTweetId = quotedTweet.id || tweetId;
-        }
-      }
-    }
-
-    const hasArticleMeta = articleMeta.title || articleMeta.previewText;
-    const hasArticleContent = articleContent.length > 500;
-
-    if (hasArticleMeta || hasArticleContent) {
-      return {
-        articleId,
-        title: articleMeta.title || null,
-        previewText: articleMeta.previewText || null,
-        content: articleContent,
-        url: articleUrl,
-        source,
-        sourceTweetId: actualTweetId
-      };
-    }
-    return null;
-  };
+  const extractArticle = (tweetData, source, tweetId) =>
+    pickXArticle(tweetData, { articleId, articleUrl, source, tweetId });
 
   // Try the bookmarked tweet first - fastest path when it contains the article directly
   if (sourceTweetId) {
@@ -594,6 +605,37 @@ export async function fetchContent(url, type, config) {
   return await fetchArticleContent(url);
 }
 
+/** t.co links in a post's text, then any new ones in its quoted tweet (the bookmarks API truncates it). */
+export function tcoLinksOf(text, quotedText) {
+  const links = (text || '').match(/https?:\/\/t\.co\/\w+/g) || [];
+  for (const link of (quotedText || '').match(/https?:\/\/t\.co\/\w+/g) || []) {
+    if (!links.includes(link)) links.push(link);
+  }
+  return links;
+}
+
+/** What an expanded link points at. Order matters: X article URLs are on x.com too. */
+export function linkType(url) {
+  if (url.includes('github.com')) return 'github';
+  if (url.includes('youtube.com') || url.includes('youtu.be')) return 'video';
+  if (url.includes('/i/article/')) return 'x-article';
+  if (url.includes('x.com') || url.includes('twitter.com')) {
+    return url.includes('/photo/') || url.includes('/video/') ? 'media' : 'tweet';
+  }
+  if (url.match(/\.(jpg|jpeg|png|gif|webp)$/i)) return 'image';
+  return 'article';
+}
+
+/** Whether a tweet's own article metadata should be fetched: it has some, and no t.co link found one already. */
+export function wantsDirectArticle(articleMeta, links) {
+  return !!articleMeta && !links.some(l => l.type === 'x-article');
+}
+
+/** The URL for an article known only from a tweet's metadata. */
+export function directArticleUrl(articleMeta, tweetId) {
+  return `https://x.com/i/article/${articleMeta.id || tweetId}`;
+}
+
 export function getExistingBookmarkIds(config) {
   try {
     const content = fs.readFileSync(config.archiveFile, 'utf8');
@@ -699,19 +741,8 @@ export async function fetchAndPrepareBookmarks(options = {}) {
       const threadText = thread ? thread.map(t => t.text || '').join('\n\n') : null;
       if (thread) console.log(`  Self-thread: ${thread.length} tweets`);
 
-      const tcoLinks = (threadText || text).match(/https?:\/\/t\.co\/\w+/g) || [];
-      
-      // Bookmarks API returns truncated quotedTweet data, so check it for links too
-      if (bookmark.quotedTweet?.text) {
-        const quotedLinks = bookmark.quotedTweet.text.match(/https?:\/\/t\.co\/\w+/g) || [];
-        for (const link of quotedLinks) {
-          if (!tcoLinks.includes(link)) {
-            tcoLinks.push(link);
-            console.log(`  Found t.co link in quoted tweet: ${link}`);
-          }
-        }
-      }
-      
+      const tcoLinks = tcoLinksOf(threadText || text, bookmark.quotedTweet?.text);
+
       const links = [];
 
       const expandedResults = await Promise.all(
@@ -724,16 +755,10 @@ export async function fetchAndPrepareBookmarks(options = {}) {
       for (const { original: link, expanded } of expandedResults) {
         console.log(`  Expanded: ${link} -> ${expanded}`);
 
-        let type = 'unknown';
+        const type = linkType(expanded);
         let content = null;
 
-        if (expanded.includes('github.com')) {
-          type = 'github';
-        } else if (expanded.includes('youtube.com') || expanded.includes('youtu.be')) {
-          type = 'video';
-        } else if (expanded.includes('/i/article/')) {
-          // Check before generic x.com - article URLs contain x.com too
-          type = 'x-article';
+        if (type === 'x-article') {
           console.log(`  X article detected: ${expanded}`);
           try {
             content = await fetchXArticleContent(expanded, config, bookmark.id);
@@ -747,39 +772,30 @@ export async function fetchAndPrepareBookmarks(options = {}) {
           } catch (error) {
             console.log(`  Could not fetch X article: ${error.message}`);
             content = {
-              articleId: expanded.match(/\/i\/article\/(\d+)/)?.[1],
+              articleId: xArticleId(expanded) ?? undefined,
               url: expanded,
               source: 'x-article',
               error: error.message
             };
           }
-        } else if (expanded.includes('x.com') || expanded.includes('twitter.com')) {
-          if (expanded.includes('/photo/') || expanded.includes('/video/')) {
-            type = 'media';
-          } else {
-            type = 'tweet';
-            // Quote tweet - fetch the quoted tweet for context
-            const tweetIdMatch = expanded.match(/status\/(\d+)/);
-            if (tweetIdMatch) {
-              const quotedTweetId = tweetIdMatch[1];
-              console.log(`  Quote tweet detected, fetching ${quotedTweetId}...`);
-              const quotedTweet = await fetchTweet(config, quotedTweetId);
-              if (quotedTweet) {
-                content = {
-                  id: quotedTweet.id,
-                  author: quotedTweet.author?.username || 'unknown',
-                  authorName: quotedTweet.author?.name || quotedTweet.author?.username || 'unknown',
-                  text: quotedTweet.text || quotedTweet.full_text || '',
-                  tweetUrl: `https://x.com/${quotedTweet.author?.username || 'unknown'}/status/${quotedTweet.id}`,
-                  source: 'quote-tweet'
-                };
-              }
+        } else if (type === 'tweet') {
+          // Quote tweet - fetch the quoted tweet for context
+          const tweetIdMatch = expanded.match(/status\/(\d+)/);
+          if (tweetIdMatch) {
+            const quotedTweetId = tweetIdMatch[1];
+            console.log(`  Quote tweet detected, fetching ${quotedTweetId}...`);
+            const quotedTweet = await fetchTweet(config, quotedTweetId);
+            if (quotedTweet) {
+              content = {
+                id: quotedTweet.id,
+                author: quotedTweet.author?.username || 'unknown',
+                authorName: quotedTweet.author?.name || quotedTweet.author?.username || 'unknown',
+                text: quotedTweet.text || quotedTweet.full_text || '',
+                tweetUrl: `https://x.com/${quotedTweet.author?.username || 'unknown'}/status/${quotedTweet.id}`,
+                source: 'quote-tweet'
+              };
             }
           }
-        } else if (expanded.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
-          type = 'image';
-        } else {
-          type = 'article';
         }
 
         // Fetch content for articles and GitHub repos
@@ -826,10 +842,10 @@ export async function fetchAndPrepareBookmarks(options = {}) {
 
       // Fallback for tweets with article metadata but no t.co link to expand
       const processDirectArticle = async (articleMeta, tweetId, source) => {
-        if (!articleMeta || links.some(l => l.type === 'x-article')) return;
-        
+        if (!wantsDirectArticle(articleMeta, links)) return;
+
         console.log(`  Direct X article detected ${source}`);
-        const articleUrl = `https://x.com/i/article/${articleMeta.id || tweetId}`;
+        const articleUrl = directArticleUrl(articleMeta, tweetId);
         try {
           const content = await fetchXArticleContent(articleUrl, config, tweetId);
           if (content.content) {
