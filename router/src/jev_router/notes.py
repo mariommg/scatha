@@ -105,10 +105,9 @@ HOWTO = {
 }
 
 
-def note_schema(bucket: str) -> dict:
-    """The HOWTO section is asked for on AI notes only."""
-    if bucket != "ai":
-        return NOTE_SCHEMA
+def note_schema() -> dict:
+    """The note's shape. HOWTO is offered on every topic; Haiku fills it only when the post shares
+    something to reuse, so the content decides, not the topic it was filed under."""
     s = json.loads(json.dumps(NOTE_SCHEMA))
     s["properties"]["howto"] = HOWTO
     s["required"].append("howto")
@@ -326,6 +325,19 @@ def _linked(b: dict) -> list[dict]:
     return out
 
 
+def quote_sources(b: dict, translated: bool) -> dict[str, str]:
+    """The text a quote may come from, per `from` label: everything Haiku was shown (material),
+    uncut. A translated post can't be quoted: the reader sees the translation, not the original."""
+    linked = [l.get("title") or "" for l in _linked(b)] + [l.get("summary") or "" for l in _linked(b)]
+    linked += [l.get("text") or "" for l in _linked(b)]
+    linked += [(l.get("content") or {}).get("text") or "" for l in b.get("links", []) if l.get("type") == "tweet"]
+    return {
+        "post": "" if translated else post_text(b) + "\n" + (b.get("quoteContext") or {}).get("text", ""),
+        "images": b.get("imageText") or "",
+        "linked": "\n".join(filter(None, linked)),
+    }
+
+
 def material(b: dict) -> tuple[dict, int]:
     links = _linked(b)
     budget = NOTE_WORDS // max(1, len(links))
@@ -541,15 +553,8 @@ def cmd_write(args) -> dict:
         b = bms[r["item_id"]]
         m, words = material(b)
         content = [{"type": "text", "text": "Write a note for this bookmark.\n\n" + json.dumps(m, ensure_ascii=False, indent=1)}]
-        note, usage = haiku(content, note_schema(r["primary"]))
-        sources = {
-            "post": post_text(b) + "\n" + (b.get("quoteContext") or {}).get("text", ""),
-            "images": b.get("imageText") or "",
-            "linked": "\n".join((l.get("content") or {}).get("text") or (l.get("content") or {}).get("content") or ""
-                                for l in b.get("links", [])),
-        }
-        if note.get("post_in_english"):  # the reader sees the translation; a verbatim quote would be untranslated
-            sources["post"] = ""
+        note, usage = haiku(content, note_schema())
+        sources = quote_sources(b, translated=bool(note.get("post_in_english")))
         note["pull_quotes"], dropped = verified_quotes(note.get("pull_quotes"), sources)
         for q in dropped:
             print(f"  dropped a quote not found verbatim in {q.get('from')} (@{b['author']}): {q.get('quote', '')!r}")

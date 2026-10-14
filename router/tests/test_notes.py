@@ -5,10 +5,19 @@ import pytest
 from jev_router.notes import note_schema, verified_quotes
 
 
-def test_howto_only_on_ai_notes():
-    assert "howto" in note_schema("ai")["required"]
-    for bucket in ("knowledge_work", "general_knowledge", "life_hackery", "journalism"):
-        assert "howto" not in note_schema(bucket)["properties"]
+def test_howto_is_offered_on_every_topic_and_may_be_empty():
+    # Whether a note gets a how-to depends on the post (does it share something to reuse?),
+    # not on which topic it landed in or what that topic is called
+    s = note_schema()
+    assert "howto" in s["required"]
+    assert "null" in s["properties"]["howto"]["type"]
+
+
+def test_a_note_without_a_howto_has_no_section():
+    from jev_router.notes import render
+    b = {"id": "9", "text": "an opinion", "author": "x", "tweetUrl": "https://x.com/x/status/9", "links": []}
+    note = {"title": "T", "summary": "s", "tags": [], "key_points": ["k"], "howto": None}
+    assert "## How to" not in render(b, {"primary": "journalism", "topics": {"journalism": 0.9}}, note, 10)
 
 
 def quote(text, src="post"):
@@ -260,3 +269,18 @@ def test_vitals_survives_api_errors(monkeypatch, code, remaining, raises):
             github.vitals("a/tool")
     else:
         assert github.vitals("a/tool") is None
+
+
+def test_quote_sources_cover_everything_haiku_was_shown():
+    # 2026-10-14: a LessWrong comment lives in the page's description; the quote was real but dropped
+    from jev_router.notes import quote_sources
+    b = {"id": "1", "text": "post", "links": [
+        {"type": "article", "expanded": "https://lesswrong.com/c", "content": {
+            "title": "Which skincare products are evidence-based?",
+            "description": "Comment by rosiecam - Sunscreen and retinoids get you almost all the way there."}},
+        {"type": "github", "expanded": "https://github.com/a/b", "content": {"fullName": "a/b", "readme": "Install it with pip."}}]}
+    src = quote_sources(b, translated=False)
+    kept, _ = verified_quotes([{"quote": "Sunscreen and retinoids get you almost all the way there.", "from": "linked"},
+                               {"quote": "Install it with pip.", "from": "linked"}], src)
+    assert len(kept) == 2
+    assert quote_sources(b, translated=True)["post"] == ""  # a translated post can't be quoted
