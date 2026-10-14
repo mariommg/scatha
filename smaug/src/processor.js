@@ -447,7 +447,14 @@ export async function expandTcoLink(url, timeout = 10000) {
 }
 
 export function isPaywalled(url) {
-  return PAYWALL_DOMAINS.some(domain => url.includes(domain));
+  // Match the site's host, not the text anywhere in the URL: "ft.com" is inside "microsoft.com"
+  let host;
+  try {
+    host = new URL(url).hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  return PAYWALL_DOMAINS.some(domain => host === domain || host.endsWith(`.${domain}`));
 }
 
 export function stripQuerystring(url) {

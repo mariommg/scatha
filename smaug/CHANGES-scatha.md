@@ -52,5 +52,9 @@ used; the router in `../router` sorts and writes notes instead.
   hop at a time (5 at most). Used by t.co expansion, article fetches, and the X article
   page fallback; a refused link only loses that link's content. Known gap: DNS
   rebinding (the name is looked up again when fetch connects). No new dependencies.
+- **Paywall check matches the site, not text.** `isPaywalled` used to ask whether the URL
+  contained a listed domain anywhere, so `microsoft.com` counted as `ft.com` (and a
+  domain in a path, query, or lookalike host counted too), and the article body was
+  never fetched. It now parses the host and matches the domain or a subdomain of it.
 - **Sample data removed.** The upstream author's own `bookmarks.md` and `knowledge/`
   examples are not included.

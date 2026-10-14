@@ -189,6 +189,25 @@ describe('isPaywalled', () => {
   test('returns false for Twitter', () => {
     assert.strictEqual(isPaywalled('https://twitter.com/user/status/123'), false);
   });
+
+  test('matches the site itself and its subdomains', () => {
+    assert.strictEqual(isPaywalled('https://ft.com/content/1'), true);
+    assert.strictEqual(isPaywalled('https://cooking.nytimes.com/recipes/1'), true);
+    assert.strictEqual(isPaywalled('https://WWW.NYTIMES.COM/x'), true);
+  });
+
+  test('a listed name inside another site does not count', () => {
+    for (const url of [
+      'https://www.microsoft.com/en-us/research/blog/x',  // contains "ft.com"
+      'https://minecraft.com/news',
+      'https://notnytimes.com/a',                          // lookalike
+      'https://example.com/why-i-left-nytimes.com',        // in the path
+      'https://example.com/?ref=wsj.com',                  // in the query
+      'https://wsj.com@example.com/a',                     // in the user-info
+      'https://nytimes.com.example.net/a',                 // as a subdomain of another site
+      'not a url nytimes.com',
+    ]) assert.strictEqual(isPaywalled(url), false, url);
+  });
 });
 
 describe('stripQuerystring', () => {
