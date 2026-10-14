@@ -61,7 +61,8 @@ def verify_notes(cfg: dict) -> str | None:
         return f"{type(e).__name__}: {e}"
 
 
-_LOGGED_OUT = re.compile(r"authenticat|oauth|/login|not logged in|invalid api key|\b401\b", re.I)
+_LOGGED_OUT = re.compile(r"authenticat|oauth|/login|not logged in|invalid api key|401 unauthorized|status(?: code)?:? 401",
+                         re.I)  # never a bare 401: paths and ids contain it
 
 
 def notes_error_in_words(err: str, backend: str) -> str:

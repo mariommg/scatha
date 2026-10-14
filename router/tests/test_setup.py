@@ -322,6 +322,9 @@ def test_a_double_paste_is_caught(monkeypatch, capsys):
     ("RuntimeError: claude -p failed: Failed to authenticate: OAuth session expired and could not be refreshed", "/login"),
     ("RuntimeError: claude -p failed: Invalid API key · Please run /login", "/login"),
     ("RuntimeError: claude -p failed: rate limited", "rate limited"),
+    ("RuntimeError: claude -p failed: API Error: 401 Unauthorized", "/login"),
+    # A bare 401 in a path is not a login failure (a pytest-401 temp folder once tripped this)
+    ("Claude Code isn't at C:/tmp/pytest-401/claude.exe any more", "pytest-401"),
 ])
 def test_claude_login_failures_are_explained(err, expect):
     from jev_router import checks
