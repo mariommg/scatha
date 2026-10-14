@@ -176,7 +176,7 @@ const el = (tag, attrs = {}, ...kids) => {
   return n;
 };
 
-let deck, verdicts = {}, topicByKey = {}, filter = "close", current = null, closed = false;
+let deck, verdicts = {}, topicByKey = {}, filter = "close", current = null, closed = false, gone = false;
 const saving = new Map();   // id -> "saving" | "error"
 const queued = new Map();   // id -> payload waiting to be sent
 const noteTimers = new Map();
@@ -273,7 +273,7 @@ function updateProgress() {
   const busy = [...saving.values()].filter((s) => s === "saving").length + queued.size;
   const s = $("save");
   s.className = "save" + (errs ? " err" : "");
-  s.textContent = errs ? `${errs} not saved` : busy ? "Saving…" : "All saved";
+  s.textContent = gone && errs ? `Desk stopped, ${errs} not saved (see top)` : errs ? `${errs} not saved` : busy ? "Saving…" : "All saved";
 }
 
 function closeTag(it) {
@@ -398,10 +398,12 @@ async function flush(id, attempt) {
     const r = await api("/api/verdict", payload);
     if (r.record) verdicts[id] = r.record; else delete verdicts[id];
     saving.delete(id);
+    gone = false;
     if (queued.has(id)) return flush(id, 0);  // a newer click arrived while this one was in flight
   } catch (e) {
     if (!queued.has(id)) queued.set(id, payload);
     saving.set(id, "error");
+    if (e instanceof TypeError) serverGone();  // network failure: nothing is listening, not a bad answer
     if (!closed) setTimeout(() => flush(id, attempt + 1), Math.min(30000, 1000 * 2 ** attempt));
   }
   const st = $(`st-${id}`);
@@ -410,6 +412,17 @@ async function flush(id, attempt) {
     st.className = "state" + (s === "error" ? " err" : "");
     st.textContent = s === "error" ? "not saved, retrying" : v?.verdict ? `saved: ${label(v.verdict)}` : (v?.note ? "note saved" : "");
   }
+  updateProgress();
+}
+
+function serverGone() {
+  const unsaved = [...queued.keys()].map((id) => deck.items.find((i) => i.id === id)).filter(Boolean);
+  const f = $("fatal");
+  f.hidden = false;
+  f.textContent = `The desk has stopped running (the terminal window or program that started it closed), so answers can't be saved. ` +
+    `Everything that showed "saved" is safe. Not saved: ${unsaved.length} (${unsaved.map((i) => "@" + i.author).join(", ")}). ` +
+    `Run setup review again to reopen the desk at its new address, and answer those again there.`;
+  gone = true;
   updateProgress();
 }
 
