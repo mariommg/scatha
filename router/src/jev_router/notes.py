@@ -60,14 +60,15 @@ NOTE_SCHEMA = {
         "pull_quotes": {
             "type": "array", "maxItems": 2,
             "description": (
-                "Zero to two passages copied EXACTLY, character for character, from the material: the lede, "
+                "Zero to two passages copied EXACTLY, character for character, from the material: whole "
+                "sentences, no cuts or ellipses. Pick the lede, "
                 "the main point, or the line that best brings the piece back to mind. Use them when the "
                 "material has real prose worth quoting; return an empty list for thin posts."
             ),
             "items": {
                 "type": "object", "additionalProperties": False, "required": ["quote", "from"],
                 "properties": {
-                    "quote": {"type": "string", "description": "Verbatim text, 1 to 3 sentences"},
+                    "quote": {"type": "string", "description": "Verbatim text, 1 to 3 whole consecutive sentences"},
                     "from": {"type": "string", "enum": ["post", "images", "linked"],
                              "description": "Which part of the material it was copied from"},
                 },
@@ -114,33 +115,90 @@ def note_schema(bucket: str) -> dict:
     return s
 
 
-def _norm(s: str) -> str:
-    """Compare text, not typography: Unicode styled letters, quote marks, dashes, spacing."""
-    s = unicodedata.normalize("NFKC", html.unescape(s or ""))  # NFKC maps styled letters like 𝘄 to w
-    s = re.sub(r"[\"'‘’“”«»`]", "", s)
-    s = re.sub(r"[‐-―]", "-", s)
-    return re.sub(r"\s+", " ", s).strip().lower()
+QUOTE_MAX = 600  # characters, after widening to whole sentences
+_MARKS = "\"'‘’“”«»`"
+_CLOSERS = "\"'’”»)]"
+_ENDS = ".!?"
+_BULLET = re.compile(r"^(?:[-*•]|\d+[.)])\s+")  # a list item's marker is layout, not words
 
 
-def _found(quote: str, hay: str) -> bool:
-    """Every ellipsis-separated fragment appears, in order."""
-    pos = 0
-    for frag in re.split(r"\.\.\.|…|\[\.\.\.\]", quote):
-        frag = _norm(frag).strip(" .,;:")
-        if not frag:
+def _comparable(text: str) -> tuple[str, list[int]]:
+    """Text with typography set aside (styled letters, quote marks, dashes, spacing, case),
+    plus each character's position in `text`, so a match can be read back from the source."""
+    out, at = [], []
+    for i, c in enumerate(text):
+        if c in _MARKS:
             continue
-        i = hay.find(frag, pos)
-        if i < 0:
-            return False
-        pos = i + len(frag)
-    return pos > 0
+        if c.isspace():
+            if out and out[-1] != " ":
+                out.append(" ")
+                at.append(i)
+            continue
+        for d in unicodedata.normalize("NFKC", c).lower():  # NFKC maps styled letters like 𝘄 to w
+            out.append("-" if "‐" <= d <= "―" else d)
+            at.append(i)
+    return "".join(out), at
+
+
+def _starts_sentence(text: str, i: int) -> bool:
+    j = i
+    while j > 0 and text[j - 1] in " \t":
+        j -= 1
+    if j == 0 or text[j - 1] == "\n":
+        return True
+    if j == i and not text[i].isupper():  # "output.Capital": extraction glued two paragraphs
+        return False
+    while j > 0 and text[j - 1] in _CLOSERS:
+        j -= 1
+    return j > 0 and text[j - 1] in _ENDS
+
+
+def _ends_sentence(text: str, e: int) -> bool:
+    if e >= len(text) or text[e] == "\n":
+        return True
+    k = e
+    while k > 0 and text[k - 1] in _CLOSERS:
+        k -= 1
+    return k > 0 and text[k - 1] in _ENDS and (text[e].isspace() or text[e].isupper())
+
+
+def _source_passage(quote: str, source: str) -> str | None:
+    """The whole sentences of `source` holding `quote` as one unbroken run of words, in the
+    source's own characters; None if it isn't there. No cuts: "a ... b" only matches a
+    source that says "a ... b". Widening to whole sentences keeps a quoted half-sentence
+    from shedding the "I don't think" in front of it."""
+    text = unicodedata.normalize("NFC", html.unescape(source or ""))
+    hay, at = _comparable(text)
+    # Edge punctuation can differ ("expensive." for "expensive, restricting..."): the source's sentence is shown anyway
+    needle = _comparable(unicodedata.normalize("NFC", html.unescape(quote or "")))[0].strip(" .,;:")
+    if not needle:
+        return None
+    i = hay.find(needle)
+    while i >= 0:
+        j = i + len(needle)
+        whole_words = ((i == 0 or not (hay[i - 1].isalnum() and hay[i].isalnum()))
+                       and (j == len(hay) or not (hay[j - 1].isalnum() and hay[j].isalnum())))
+        if whole_words:
+            s, e = at[i], at[j - 1] + 1
+            while not _starts_sentence(text, s) and e - s <= QUOTE_MAX:
+                s -= 1
+            while not _ends_sentence(text, e) and e - s <= QUOTE_MAX:
+                e += 1
+            return _BULLET.sub("", text[s:e]) if e - s <= QUOTE_MAX else None
+        i = hay.find(needle, i + 1)
+    return None
 
 
 def verified_quotes(quotes: list[dict], sources: dict[str, str]) -> tuple[list[dict], list[dict]]:
-    """Keep only quotes that really appear in the part of the material they claim."""
+    """Keep quotes found in the part of the material they claim, rewritten as the source's own
+    text (see _source_passage). The note never shows the model's copy, only the source's."""
     kept, dropped = [], []
     for q in quotes or []:
-        (kept if _found(q.get("quote", ""), _norm(sources.get(q.get("from"), ""))) else dropped).append(q)
+        passage = _source_passage(q.get("quote", ""), sources.get(q.get("from"), ""))
+        if passage:
+            kept.append(q | {"quote": passage})
+        else:
+            dropped.append(q)
     return kept, dropped
 
 

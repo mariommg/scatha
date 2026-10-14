@@ -5,33 +5,93 @@ import pytest
 from jev_router.notes import note_schema, verified_quotes
 
 
-def test_only_verbatim_quotes_survive():
-    src = {"post": "He said \u201cLive forever!\u201d and   walked off.", "images": "", "linked": ""}
-    kept, dropped = verified_quotes([
-        {"quote": 'He said "Live forever!"', "from": "post"},  # curly quotes and spacing normalize
-        {"quote": "Live for never", "from": "post"},  # paraphrase
-        {"quote": "He said", "from": "images"},  # right words, wrong source
-    ], src)
-    assert [q["quote"] for q in kept] == ['He said "Live forever!"']
-    assert len(dropped) == 2
-
-
 def test_howto_only_on_ai_notes():
     assert "howto" in note_schema("ai")["required"]
     for bucket in ("knowledge_work", "general_knowledge", "life_hackery", "journalism"):
         assert "howto" not in note_schema(bucket)["properties"]
 
 
+def quote(text, src="post"):
+    return {"quote": text, "from": src}
+
+
+def kept_quotes(quotes, post, images=""):
+    kept, _ = verified_quotes(quotes, {"post": post, "images": images, "linked": ""})
+    return [q["quote"] for q in kept]
+
+
+def test_quotes_come_from_the_claimed_source_or_not_at_all():
+    post = "He said “Live forever!” and walked off."
+    assert kept_quotes([quote("Live for never"),  # paraphrase
+                        quote("He said", "images")], post, images="nothing like it") == []  # right words, wrong source
+
+
+def test_the_note_shows_the_source_characters_not_the_models():
+    post = "He said “Live   forever!” and walked off. Then it rained."
+    # Haiku's straight quotes, single spaces, and lowercase still find the passage; the note gets the original
+    assert kept_quotes([quote('he said "Live forever!" and walked off.')], post) == \
+        ["He said “Live   forever!” and walked off."]
+
+
 def test_typography_does_not_count_as_a_misquote():
-    src = {"post": "Have Opus vibe-code a quick \U0001d604\U0001d5f2\U0001d5f2\U0001d5f8\U0001d5f9\U0001d606 calendar. "
-                   "I follow \u201cGenetic method\u201d by Toeplitz \u2014 and Lakatos.", "images": "", "linked": ""}
-    kept, dropped = verified_quotes([
-        {"quote": "vibe-code a quick weekly calendar", "from": "post"},  # styled letters
-        {"quote": "I follow 'Genetic method' by Toeplitz - and Lakatos.", "from": "post"},  # quote marks, dash
-        {"quote": "Have Opus ... weekly calendar", "from": "post"},  # elision
-        {"quote": "calendar ... Have Opus", "from": "post"},  # elision out of order
-    ], src)
-    assert len(kept) == 3 and dropped[0]["quote"].startswith("calendar")
+    post = ("Have Opus vibe-code a quick 𝘄𝗲𝗲𝗸𝗹𝘆 calendar.\n"
+            "I follow “Genetic method” by Toeplitz — and Lakatos. Cafe\u0301 &amp; more.")  # e + combining accent
+    assert kept_quotes([quote("Have Opus vibe-code a quick weekly calendar."),  # styled letters
+                        quote("I follow 'Genetic method' by Toeplitz - and Lakatos.")], post) == [  # marks, dash
+        "Have Opus vibe-code a quick 𝘄𝗲𝗲𝗸𝗹𝘆 calendar.",
+        "I follow “Genetic method” by Toeplitz — and Lakatos."]
+    assert kept_quotes([quote("Caf\u00e9 & more.")], post) == ["Caf\u00e9 & more."]  # accents, HTML entities
+
+
+def test_cuts_are_not_allowed():
+    post = "The drug is safe. We found no evidence that it works. More trials are planned."
+    assert kept_quotes([quote("The drug is safe ... it works.")], post) == []
+    assert kept_quotes([quote("The drug is safe… it works.")], post) == []
+    # Ellipses the source itself contains are text like any other
+    assert kept_quotes([quote("Wait... what?")], "Wait... what? No.") == ["Wait... what?"]
+
+
+def test_a_partial_sentence_widens_to_the_whole_sentence():
+    # Quoting the tail of a sentence must not drop its negation
+    post = "Intro line. I do not think scaling alone gets us there. Next point."
+    assert kept_quotes([quote("scaling alone gets us there")], post) == \
+        ["I do not think scaling alone gets us there."]
+    assert kept_quotes([quote("Intro line. I do not")], post) == ["Intro line. I do not think scaling alone gets us there."]
+    # A sentence that ends in a closing quote mark keeps it; a line break ends a sentence
+    assert kept_quotes([quote("ship it")], "She said “ship it.” Done.") == ["She said “ship it.”"]
+    assert kept_quotes([quote("a headline")], "Just a headline\nThe body.") == ["Just a headline"]
+
+
+def test_a_match_inside_a_word_does_not_count():
+    assert kept_quotes([quote("said it")], "He unsaid it.") == []
+    assert kept_quotes([quote("it work")], "Does it work? Yes.") == ["Does it work?"]  # sanity: whole words fine
+
+
+def test_punctuation_at_the_edges_is_forgiven_since_the_source_sentence_is_shown():
+    # Haiku ends a half-sentence with "." where the source goes on after a comma (4 of 399 vault quotes)
+    post = "Inference is prohibitively expensive, restricting large parts of the web. Next."
+    assert kept_quotes([quote("Inference is prohibitively expensive.")], post) == \
+        ["Inference is prohibitively expensive, restricting large parts of the web."]
+
+
+def test_paragraphs_glued_by_article_extraction_still_break_sentences():
+    # Readability text often drops the break between paragraphs: "economy.Capital"
+    post = "We must not base the value of life on output.Capital, it turns out, only fears health.Next one."
+    assert kept_quotes([quote("Capital, it turns out, only fears health.")], post) == \
+        ["Capital, it turns out, only fears health."]
+    assert kept_quotes([quote("Pi is 3.14 or so")], "Pi is 3.14 or so. Yes.") == ["Pi is 3.14 or so."]  # not before a digit
+
+
+def test_a_list_bullet_is_not_part_of_the_quote():
+    post = "Principles:\n- Do not preserve backward compatibility.\n2. Grow the system in layers.\n"
+    assert kept_quotes([quote("Do not preserve backward compatibility."),
+                        quote("Grow the system in layers.")], post) == \
+        ["Do not preserve backward compatibility.", "Grow the system in layers."]
+
+
+def test_a_quote_that_widens_past_the_cap_is_dropped():
+    long = "This one sentence " + "goes on and on " * 60 + "until it ends."
+    assert kept_quotes([quote("This one sentence goes on")], long) == []
 
 
 def _bookmark():

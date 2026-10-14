@@ -15,7 +15,7 @@ It runs while you sleep. You wake up to notes.
 1. **Fetch.** [Smaug](https://github.com/alexknowshtml/smaug) pulls new bookmarks through your own X session, expands links, grabs article text, follows threads and quoted posts, and collects images.
 2. **Read images.** Posts that are mostly screenshots get their images read by Claude Haiku, so a story told in four photos counts as a story.
 3. **Sort.** [Jev](https://typesafe.ai), a small, fast judgment model from TypeSafe, asks one yes/no question per topic ("Is this about AI?") and the bookmark goes to the topic it scores highest on. Nothing fits? It's skipped. That's how the junk stays out.
-4. **Write.** Claude Haiku writes the note. Quotes are checked word for word against the source before they're kept; a paraphrase in quotation marks never makes it into your vault.
+4. **Write.** Claude Haiku writes the note. Haiku picks the quotes; the code copies them out of the source. Each one shows the source's own words as whole sentences with nothing cut out, so a quoted half-sentence can't lose the "I don't think" in front of it. A quote Haiku can't point to in the source is dropped.
 5. **Remember.** Every processed bookmark goes in a ledger, so nothing is done twice and a note that failed gets retried next run.
 
 ## What you need
