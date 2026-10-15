@@ -388,18 +388,13 @@ export async function fetchFromFolders(config, count = 10, options = {}) {
   return allBookmarks;
 }
 
-// Thread markers like "(1/2)", "1/", "🧵", "thread 👇" suggest the author continued below
-const THREAD_MARKER = /(\b\d{1,2}\s?\/\s?\d{0,2}\)?(\s|$))|🧵|\bthread\b|👇/i;
-
 /**
  * Fetch the author's own continuation of a thread (self-replies only, no other repliers).
  * Returns tweets in thread order, including the bookmarked one, or null if not a thread.
+ * Every bookmark is asked about: openers often carry no marker ("8 sentences to carve into
+ * your desk:"), and guessing from the text missed 4 of 7 threads in a sample (2026-10-15).
  */
 export async function fetchSelfThread(config, bookmark) {
-  const text = bookmark.text || bookmark.full_text || '';
-  const midThread = bookmark.conversationId && String(bookmark.conversationId) !== String(bookmark.id);
-  if (!midThread && !THREAD_MARKER.test(text)) return null;
-
   try {
     const parsed = await x.thread(config, bookmark.id);
     const tweets = Array.isArray(parsed) ? parsed : (parsed.tweets || []);
