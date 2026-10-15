@@ -197,3 +197,144 @@ def test_finish_sorting_writes_full_notes_removes_light_and_fixes_ledger(home, m
     led = (work / "ingested.md").read_text(encoding="utf-8")
     assert "status/1 | 2026-10-10 | route | journalism" in led and "status/2 | 2026-10-10 | skip" in led
     assert review.finish_sorting(cfg, say=lambda *a: None, ask=lambda q: True) == 0  # done is done
+
+
+# ---------- "not worth keeping": light notes the user deletes ----------
+
+def unsorted_with(home, n):
+    """n skipped bookmarks, each with a light note in Unsorted, as a run leaves them."""
+    cfg = app.load_config()
+    tax = Taxonomy.load(home / "topics.yaml")
+    work = app.work()
+    (work / "runs" / "r").mkdir(parents=True, exist_ok=True)
+    bms = [dict(B, id=str(i), tweetUrl=f"https://x.com/p{i}/status/{i}", author=f"p{i}", text=f"post {i}")
+           for i in range(1, n + 1)]
+    (work / "runs" / "r" / "pending-bookmarks.json").write_text(json.dumps({"bookmarks": bms}), encoding="utf-8")
+    (work / "ingested.md").write_text(
+        "# l\n\n" + "".join(f"- {b['tweetUrl']} | 2026-10-10 | skip | ai\n" for b in bms), encoding="utf-8")
+    where = unsorted.folder(cfg, tax)
+    unsorted.write([(b, {"ai": 0.1}) for b in bms], where, tax)
+    return cfg, tax, unsorted.notes_by_id(where)
+
+
+def drops(source=None):
+    return {i for i, v in desk.Verdicts(review.verdicts_path()).load().items()
+            if v["verdict"] == desk.DROP and (source is None or v["source"] == source)}
+
+
+def test_deleting_a_light_note_counts_as_not_worth_keeping(home):
+    cfg, tax, light = unsorted_with(home, 3)
+    assert unsorted.check(cfg, tax)["recorded"] == 0  # first look: nothing was seen before, nothing judged
+    light["2"].unlink()
+    assert unsorted.check(cfg, tax)["recorded"] == 1
+    v = desk.Verdicts(review.verdicts_path()).load()["2"]
+    assert v["verdict"] == desk.DROP and v["source"] == "vault" and v["author"] == "p2"
+    assert unsorted.check(cfg, tax)["recorded"] == 0  # counted once
+
+
+def test_a_note_written_and_deleted_between_looks_still_counts(home):
+    cfg, tax, light = unsorted_with(home, 2)
+    unsorted.check(cfg, tax)
+    late = dict(B, id="9", tweetUrl="https://x.com/p9/status/9", text="late")
+    with open(app.work() / "ingested.md", "a", encoding="utf-8") as f:
+        f.write("- https://x.com/p9/status/9 | 2026-10-17 | skip | ai\n")
+    [path] = unsorted.write([(late, {"ai": 0.1})], unsorted.folder(cfg, tax), tax)
+    path.unlink()  # gone before scatha looked again
+    assert unsorted.check(cfg, tax)["recorded"] == 1 and drops() == {"9"}
+
+
+def test_a_moved_note_is_not_a_deletion_but_obsidian_trash_is(home):
+    cfg, tax, light = unsorted_with(home, 2)
+    unsorted.check(cfg, tax)
+    moved = home / "vault" / "AI" / light["1"].name
+    moved.parent.mkdir(parents=True)
+    light["1"].rename(moved)
+    trash = home / "vault" / ".trash" / light["2"].name  # Obsidian's own trash keeps a copy
+    trash.parent.mkdir(parents=True)
+    light["2"].rename(trash)
+    assert unsorted.check(cfg, tax)["recorded"] == 1 and drops() == {"2"}
+
+
+def test_answers_already_given_are_left_alone(home):
+    cfg, tax, light = unsorted_with(home, 3)
+    unsorted.check(cfg, tax)
+    store = desk.Verdicts(review.verdicts_path())
+    store.put("1", {"verdict": "journalism", "source": "desk"})  # sorted on the desk, Done not pressed yet
+    store.put("2", {"verdict": desk.DROP, "source": "desk"})  # Don't keep, removed by Done
+    for p in light.values():
+        p.unlink()
+    assert unsorted.check(cfg, tax)["recorded"] == 1
+    assert desk.Verdicts(review.verdicts_path()).load()["1"]["verdict"] == "journalism"
+    assert drops("vault") == {"3"} and drops("desk") == {"2"}
+
+
+def test_a_missing_folder_records_nothing(home):
+    cfg, tax, light = unsorted_with(home, 2)
+    unsorted.check(cfg, tax)
+    for p in light.values():
+        p.unlink()
+    unsorted.folder(cfg, tax).rmdir()  # renamed or moved away: not a judgment
+    assert unsorted.check(cfg, tax) == {"recorded": 0, "held": 0, "missing": True}
+    unsorted.folder(cfg, tax).mkdir()
+    assert unsorted.check(cfg, tax)["recorded"] == 2  # the folder is back and they're still gone
+
+
+def test_many_gone_at_once_waits_for_a_yes(home):
+    n = unsorted.HOLD_OVER + 1
+    cfg, tax, light = unsorted_with(home, n)
+    unsorted.check(cfg, tax)
+    for p in light.values():
+        p.unlink()
+    assert unsorted.check(cfg, tax) == {"recorded": 0, "held": n}  # a night run can't ask
+    assert unsorted.check(cfg, tax) == {"recorded": 0, "held": n}  # still waiting
+    s = report.state(cfg)
+    assert s["held"] == n and report.levers(s)[0].startswith(f"`{app.command()}`")
+    asked = []
+    assert unsorted.check(cfg, tax, ask=lambda q: asked.append(q) or False) == {"recorded": 0, "held": 0}
+    assert f"{n} Unsorted notes" in asked[0] and drops() == set()
+    assert unsorted.check(cfg, tax, ask=lambda q: True) == {"recorded": 0, "held": 0}  # a no is final
+
+
+def test_many_gone_with_a_yes_all_count(home):
+    n = unsorted.HOLD_OVER + 1
+    cfg, tax, light = unsorted_with(home, n)
+    unsorted.check(cfg, tax)
+    for p in light.values():
+        p.unlink()
+    assert unsorted.check(cfg, tax, ask=lambda q: True) == {"recorded": n, "held": 0}
+    assert len(drops("vault")) == n
+
+
+def test_off_checks_nothing(home):
+    cfg, tax, light = unsorted_with(home, 1)
+    unsorted.check(cfg, tax)
+    light["1"].unlink()
+    cfg["unsorted"] = {"mode": "off"}
+    assert unsorted.check(cfg, tax) == {"recorded": 0, "held": 0}
+
+
+def test_backfill_does_not_bring_back_what_you_threw_out(home):
+    cfg, tax, light = unsorted_with(home, 2)
+    unsorted.check(cfg, tax)
+    light["1"].unlink()
+    unsorted.check(cfg, tax)
+    assert unsorted.backfill(cfg, apply=True, say=lambda *a: None) == 0
+    assert set(unsorted.notes_by_id(unsorted.folder(cfg, tax))) == {"2"}
+
+
+def test_report_counts_what_was_not_worth_keeping(home):
+    cfg, tax, light = unsorted_with(home, 3)
+    unsorted.check(cfg, tax)
+    light["1"].unlink()
+    unsorted.check(cfg, tax)
+    desk.Verdicts(review.verdicts_path()).put("2", {"verdict": desk.DROP, "source": "desk"})
+    out = report.text(cfg)
+    assert "Not worth keeping: 2 (1 deleted from Unsorted, 1 marked on the desk)" in out
+
+
+def test_cli_bare_checks_for_deletions_first(home, capsys, monkeypatch):
+    cfg, tax, light = unsorted_with(home, 1)
+    unsorted.check(cfg, tax)
+    light["1"].unlink()
+    assert cli.main([]) == 0
+    assert drops("vault") == {"1"} and "Not worth keeping: 1" in capsys.readouterr().out

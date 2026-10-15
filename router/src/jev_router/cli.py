@@ -38,7 +38,11 @@ def main(argv: list[str] | None = None) -> int:
             print(line + "\n")
 
     if cmd == "status":
+        from . import Taxonomy, unsorted
         cfg = app.load_config()
+        ask = (lambda q: input(f"{q} [y/N] ").strip().lower() in ("y", "yes")) if sys.stdin.isatty() else None
+        if unsorted.check(cfg, Taxonomy.load(app.taxonomy_path(cfg)), ask=ask)["recorded"]:
+            print()
         print(report.text(cfg))
         report.write_note(cfg)
         report.mark_seen()

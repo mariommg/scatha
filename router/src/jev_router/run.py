@@ -242,6 +242,9 @@ def main(argv: list[str] | None = None) -> int:
         if not args.preview:
             report.record_run(dict(collections.Counter(b for _, b, _ in summary["written"])), len(skips),
                               failed, remaining, unsorted.mode(cfg))
+            gone = unsorted.check(cfg, tax, say=log)  # light notes deleted since the last look; no one to ask at night
+            if gone["held"]:
+                log(f"{gone['held']} Unsorted notes disappeared at once; waiting for a yes at `{app.command()}`")
             note = report.write_note(cfg)
             log(f"status note: {note}" if note else "status note: could not write it")
         ping(cfg, summary_text(summary["written"], len(skips), failed, remaining, labels, unsorted.mode(cfg)))

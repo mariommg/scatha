@@ -48,12 +48,14 @@ def translations_path() -> Path:
 # ---------- sources ----------
 
 def ledger(work: Path) -> dict[str, dict]:
-    """id -> what the run did with it: {"status": route|skip, "bucket": key or None}."""
+    """id -> what the run did with it: {"status": route|skip, "bucket": key or None, "author": handle or None}."""
     path = work / "ingested.md"
     out = {}
     if path.exists():
-        for m in re.finditer(r"status/(\d+)\s*\|[^|]*\|\s*(\w+)\s*(?:\|\s*(\w+))?", path.read_text(encoding="utf-8")):
-            out[m.group(1)] = {"status": m.group(2), "bucket": m.group(3) if m.group(2) == "route" else None}
+        for m in re.finditer(r"(?:/([^/\s]+))?/status/(\d+)\s*\|[^|]*\|\s*(\w+)\s*(?:\|\s*(\w+))?",
+                             path.read_text(encoding="utf-8")):
+            out[m.group(2)] = {"status": m.group(3), "bucket": m.group(4) if m.group(3) == "route" else None,
+                               "author": m.group(1)}
     return out
 
 

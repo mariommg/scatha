@@ -93,7 +93,28 @@ def state(cfg: dict) -> dict:
         "unsorted": unsorted.count(cfg, tax) if unsorted.mode(cfg) != "off" else 0,
         "unsorted_dir": unsorted.folder(cfg, tax), "mode": unsorted.mode(cfg),
         "failed": last["failed"] if last else 0, "remaining": last["remaining"] if last else None,
+        "held": unsorted.held_count(), "not_kept": not_kept(),
     }
+
+
+def not_kept() -> dict[str, int]:
+    """Bookmarks judged not worth keeping, by where the user said so: {"vault": n, "desk": m}."""
+    from . import desk, review
+    out = {"vault": 0, "desk": 0}
+    for v in desk.Verdicts(review.verdicts_path()).load().values():
+        if v.get("verdict") == desk.DROP:
+            out["vault" if v.get("source") == "vault" else "desk"] += 1
+    return out
+
+
+def not_kept_line(s: dict) -> str | None:
+    n = s["not_kept"]
+    if not (n["vault"] or n["desk"]):
+        return None
+    parts = [f"{n['vault']} deleted from Unsorted" if n["vault"] else "",
+             f"{n['desk']} marked on the desk" if n["desk"] else ""]
+    return (f"Not worth keeping: {n['vault'] + n['desk']} ({', '.join(p for p in parts if p)}). "
+            f"Changed your mind about one? Give it a topic in `{app.command('review')}`.")
 
 
 @dataclass(frozen=True)
@@ -105,6 +126,9 @@ class Lever:
 
 # Every lever scatha offers, most useful first. Surfaces show only those that apply now.
 LEVERS = [
+    Lever("gone", lambda s: s["held"] > 0,
+          lambda s: f"`{app.command()}`: {s['held']} Unsorted notes disappeared at once. "
+                    "Say whether they count as not worth keeping (nothing is recorded until you do)."),
     Lever("sort", lambda s: s["unsorted"] > 0,
           lambda s: f"`{app.command('review')}`: sort the {s['unsorted']} unsorted bookmarks. "
                     "Picking a topic writes the full note; Don't keep removes it."),
@@ -155,6 +179,8 @@ def text(cfg: dict) -> str:
     if s["mode"] != "off":
         lines.append(f"Unsorted now: {s['unsorted']} bookmarks in {s['unsorted_dir']}" if s["unsorted"]
                      else "Unsorted is empty: every bookmark found a topic.")
+    if not_kept_line(s):
+        lines.append(not_kept_line(s))
     if s["remaining"]:
         lines.append(f"Still queued: {s['remaining']} older bookmarks.")
     acts = levers(s)
@@ -190,6 +216,9 @@ def note(cfg: dict) -> str:
                 out.append(f"- …and {s['unsorted'] - len(newest)} more in `{s['unsorted_dir'].name}/`")
         else:
             out += ["", "Unsorted is empty: every bookmark found a topic."]
+        out += ["", "Delete an unsorted note you don't want, and scatha counts it as not worth keeping."]
+    if not_kept_line(s):
+        out += ["", not_kept_line(s)]
     acts = levers(s, limit=2)
     if acts:
         out += ["", "## What you can do", ""] + [f"- {a}" for a in acts]

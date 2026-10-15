@@ -116,6 +116,8 @@ def write(items: list[tuple[dict, dict[str, float]]], where: Path, tax: Taxonomy
             path = where / f"{_title(b)} ({b['id']}).md"
         path.write_text(render(b, scores, labels, tax.route_at), encoding="utf-8")
         written.append(path)
+    if written:
+        _remember(where, {str(b["id"]) for b, _ in items})
     return written
 
 
@@ -143,13 +145,143 @@ def backfill(cfg: dict, apply: bool, say=print) -> int:
         scores = {i["id"]: i["scores"] for i in json.loads(deck.read_text(encoding="utf-8"))["items"]}
     where = folder(cfg, tax)
     have = notes_by_id(where)
-    todo = [(bookmarks[i], scores.get(i, {})) for i in sorted(skipped) if i in bookmarks and i not in have]
+    thrown_out = judged_drops()
+    todo = [(bookmarks[i], scores.get(i, {})) for i in sorted(skipped)
+            if i in bookmarks and i not in have and i not in thrown_out]
     if not apply:
         say(f"{len(todo)} light notes would be written to {where} (dry run; pass --apply)")
         return len(todo)
     written = write(todo, where, tax)
     say(f"{len(written)} light notes written to {where}")
     return len(written)
+
+
+# ---------- "not worth keeping": light notes the user deleted ----------
+#
+# Unsorted is scatha's folder, so a light note that disappears from it is read as the user
+# saying the bookmark isn't worth keeping, the same answer as Don't keep on the desk. It's
+# recorded with the desk's verdicts (source "vault"), stays out of Unsorted and out of
+# backfill, and can be changed on the desk like any other answer. Not a deletion: a note
+# found elsewhere in the vault (moved), a missing folder (renamed or moved), a bookmark that
+# already has an answer. Full notes deleted from topic folders are ignored: people prune
+# filed notes for many reasons.
+
+HOLD_OVER = 10  # more gone than this at once looks like a folder emptied or moved: ask first
+
+
+def _seen_path() -> Path:
+    return app.work() / "unsorted-seen.json"
+
+
+def _load_seen() -> dict:
+    """{"folder": the Unsorted folder looked at, "seen": ids there last time, "held": ids waiting for a yes}."""
+    import json
+    try:
+        return json.loads(_seen_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+
+
+def _save_seen(where: Path, seen: set[str], held: set[str]) -> None:
+    import json
+    _seen_path().parent.mkdir(parents=True, exist_ok=True)
+    _seen_path().write_text(json.dumps({"folder": str(where), "seen": sorted(seen), "held": sorted(held)}),
+                            encoding="utf-8")
+
+
+def _remember(where: Path, ids: set[str]) -> None:
+    """Light notes just written, so one deleted before the next check still counts (previews don't)."""
+    state = _load_seen()
+    if state.get("folder") == str(where):
+        _save_seen(where, set(state["seen"]) | ids, set(state.get("held", [])))
+
+
+def judged_drops() -> set[str]:
+    """Bookmarks the user said aren't worth keeping, on the desk or by deleting the light note."""
+    from . import desk, review
+    return {i for i, v in desk.Verdicts(review.verdicts_path()).load().items() if v.get("verdict") == desk.DROP}
+
+
+def _vault_root(path: Path) -> Path:
+    for p in [path, *path.parents]:
+        if (p / ".obsidian").is_dir():
+            return p
+    return path.parent
+
+
+def elsewhere(ids: set[str], cfg: dict, tax: Taxonomy) -> set[str]:
+    """Which of these bookmarks have a note somewhere in the vaults scatha writes to (moved, not deleted).
+    Hidden folders are skipped: Obsidian's .trash keeps a copy of what the user deleted."""
+    roots = {_vault_root(Path(t.destination).expanduser()) for t in tax.topics if t.destination}
+    roots.add(_vault_root(folder(cfg, tax)))
+    found = set()
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for f in root.rglob("*.md"):
+            if any(part.startswith(".") for part in f.relative_to(root).parts):
+                continue
+            try:
+                head = f.read_text(encoding="utf-8", errors="ignore")[:3000]
+            except OSError:
+                continue
+            m = re.search(r'^tweet_id: "(\d+)"', head, re.M)
+            if m and m.group(1) in ids:
+                found.add(m.group(1))
+    return found
+
+
+def check(cfg: dict, tax: Taxonomy, ask=None, say=print) -> dict:
+    """Record light notes deleted from Unsorted since the last look as not worth keeping.
+    More than HOLD_OVER at once wait for a yes: `ask` is None in a night run (they stay held)."""
+    from . import desk, review
+    out = {"recorded": 0, "held": 0}
+    if mode(cfg) == "off":
+        return out
+    where = folder(cfg, tax)
+    if not where.is_dir():
+        return out | {"missing": True}
+    present = set(notes_by_id(where))
+    state = _load_seen()
+    if state.get("folder") != str(where):  # first look, or the user pointed Unsorted somewhere else
+        _save_seen(where, present, set())
+        return out
+    led = review.ledger(app.work())
+    store = desk.Verdicts(review.verdicts_path())
+    answered = {i for i, v in store.load().items() if v.get("verdict") not in (None, desk.UNSURE)}
+    gone = (set(state["seen"]) | set(state.get("held", []))) - present
+    gone = {i for i in gone if led.get(i, {}).get("status") == "skip" and i not in answered}
+    if gone:
+        gone -= elsewhere(gone, cfg, tax)
+    held: set[str] = set()
+    if len(gone) > HOLD_OVER:
+        if ask is None:
+            held, gone = gone, set()
+        elif not ask(f"{len(gone)} Unsorted notes are gone since {app.APP_NAME} last looked. "
+                     "Count them all as not worth keeping?"):
+            gone = set()  # a no is final: they were moved or cleared for some other reason
+    if gone:
+        scores = _deck_scores()
+        now = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+        for i in sorted(gone):
+            store.put(i, {"verdict": desk.DROP, "bucket": None, "note": "", "author": led[i].get("author"),
+                          "jev": None, "scores": scores.get(i), "topics_hash": None, "saved_at": now, "source": "vault"})
+        say(f"{len(gone)} deleted from Unsorted, counted as not worth keeping.")
+    _save_seen(where, present, held)
+    return {"recorded": len(gone), "held": len(held)}
+
+
+def _deck_scores() -> dict[str, dict]:
+    import json
+    from . import review
+    try:
+        return {i["id"]: i["scores"] for i in json.loads(review.deck_path().read_text(encoding="utf-8"))["items"]}
+    except (OSError, ValueError, KeyError):
+        return {}
+
+
+def held_count() -> int:
+    return len(_load_seen().get("held", []))
 
 
 def main(argv: list[str] | None = None) -> int:
