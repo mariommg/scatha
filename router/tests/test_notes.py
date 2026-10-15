@@ -29,10 +29,21 @@ def kept_quotes(quotes, post, images=""):
     return [q["quote"] for q in kept]
 
 
-def test_quotes_come_from_the_claimed_source_or_not_at_all():
+def test_quotes_come_from_the_material_or_not_at_all():
     post = "He said “Live forever!” and walked off."
-    assert kept_quotes([quote("Live for never"),  # paraphrase
-                        quote("He said", "images")], post, images="nothing like it") == []  # right words, wrong source
+    assert kept_quotes([quote("Live for never")], post) == []  # paraphrase
+    assert kept_quotes([quote("Live for never", "images")], post, images="nothing like it") == []
+
+
+def test_a_real_quote_with_the_wrong_label_is_kept_and_relabeled():
+    # Haiku called a line from the quoted post "linked"; it is verbatim, so keep it under where it was found
+    kept, dropped = verified_quotes([quote("walked off", "linked"), quote("He said", "images")],
+                                    {"post": "He said “Live forever!” and walked off.", "images": "", "linked": "x"})
+    post = "He said “Live forever!” and walked off."
+    assert [q["from"] for q in kept] == ["post", "post"] and all(q["quote"] in post for q in kept)
+    assert dropped == []
+    kept, _ = verified_quotes([quote("walked off", "linked")], {"post": "", "images": "", "linked": ""})
+    assert kept == []  # a translated post (empty source) still can't be quoted
 
 
 def test_the_note_shows_the_source_characters_not_the_models():

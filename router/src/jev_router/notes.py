@@ -189,13 +189,17 @@ def _source_passage(quote: str, source: str) -> str | None:
 
 
 def verified_quotes(quotes: list[dict], sources: dict[str, str]) -> tuple[list[dict], list[dict]]:
-    """Keep quotes found in the part of the material they claim, rewritten as the source's own
-    text (see _source_passage). The note never shows the model's copy, only the source's."""
+    """Keep quotes found in the material, rewritten as the source's own text (see _source_passage).
+    The part they claim is searched first; a quote found in another part is kept under that part's
+    label (Haiku sometimes calls a quoted post "linked"). The note never shows the model's copy."""
     kept, dropped = [], []
     for q in quotes or []:
-        passage = _source_passage(q.get("quote", ""), sources.get(q.get("from"), ""))
-        if passage:
-            kept.append(q | {"quote": passage})
+        claimed = q.get("from")
+        for part in [claimed, *(p for p in sources if p != claimed)]:
+            passage = _source_passage(q.get("quote", ""), sources.get(part, ""))
+            if passage:
+                kept.append(q | {"quote": passage, "from": part})
+                break
         else:
             dropped.append(q)
     return kept, dropped
