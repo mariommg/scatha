@@ -17,7 +17,6 @@ import asyncio
 import datetime as dt
 import html
 import json
-import os
 import re
 from pathlib import Path
 
@@ -305,10 +304,7 @@ def finish_sorting(cfg: dict, say=print, ask=None) -> int:
         say(f"  Removed {len(to_remove)} light notes.")
     if to_write and ask(f"Write full notes for the {len(to_write)} bookmarks you sorted out of Unsorted? "
                         f"(Haiku, about 2,000 Claude tokens each)"):
-        app.load_secrets()
-        os.environ["CLAUDE_BIN"] = cfg["tools"]["claude"]
-        os.environ["NOTES_BACKEND"] = cfg["notes_backend"]
-        os.environ["READER_PROFILE"] = cfg.get("reader_profile", "")
+        app.haiku_env(cfg)
         bookmarks = collect_bookmarks(app.work())
         scores = {}
         if deck_path().exists():
@@ -370,9 +366,7 @@ def main(cfg: dict, rebuild: bool = False, import_file: str | None = None, open_
     if stale and not rebuild:
         say(f"  Your topics changed since the desk was built; `{app.command('review --rebuild')}` re-scores everything.")
     else:
-        app.load_secrets()
-        os.environ["CLAUDE_BIN"] = cfg["tools"]["claude"]
-        os.environ["NOTES_BACKEND"] = cfg["notes_backend"]
+        app.haiku_env(cfg)
         build(cfg, say, reuse=not rebuild)
     store = desk.Verdicts(verdicts_path())
     if import_file:

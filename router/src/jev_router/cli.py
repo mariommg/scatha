@@ -2,6 +2,7 @@
 
     scatha                 what happened, and what you can do about it
     scatha review          the sorting desk (sort Unsorted, check Jev's close calls)
+    scatha discover        topics your bookmarks need that you haven't named (--pool: just list them)
     scatha run             import a batch now (same as the schedule; --preview, --batch N)
     scatha setup [step]    the setup wizard (x-login, topics, schedule, status, unschedule)
 
@@ -25,7 +26,7 @@ def main(argv: list[str] | None = None) -> int:
     if cmd in ("-h", "--help", "help"):
         print(HELP)
         return 0
-    if cmd not in ("status", "review", "run", "setup"):
+    if cmd not in ("status", "review", "discover", "run", "setup"):
         print(f"Unknown command '{cmd}'.\n\n{HELP}")
         return 2
 
@@ -52,6 +53,10 @@ def main(argv: list[str] | None = None) -> int:
         args = review_args(argv)
         report.mark_seen()
         return review.main(app.load_config(), args["rebuild"], args["import_file"], args["browser"], onboard.say)
+    if cmd == "discover":
+        from . import discover, onboard
+        discover.run(app.load_config(), onboard.say, pool_only="--pool" in argv)
+        return 0
     if cmd == "run":
         from . import run
         return run.main(argv)

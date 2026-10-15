@@ -154,6 +154,14 @@ def load_secrets() -> None:
         os.environ.pop("CT0")
 
 
+def haiku_env(cfg: dict) -> None:
+    """Point notes.haiku() at this install's note writer (for Haiku calls outside a run)."""
+    load_secrets()
+    os.environ["CLAUDE_BIN"] = cfg["tools"]["claude"]
+    os.environ["NOTES_BACKEND"] = cfg["notes_backend"]
+    os.environ["READER_PROFILE"] = cfg.get("reader_profile", "")
+
+
 def has_secret(var: str) -> bool:
     load_secrets()
     return bool(os.environ.get(var))
