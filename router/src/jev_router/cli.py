@@ -2,7 +2,8 @@
 
     scatha                 what happened, and what you can do about it
     scatha review          the sorting desk (sort Unsorted, check Jev's close calls)
-    scatha discover        topics your bookmarks need that you haven't named (--pool: just list them)
+    scatha discover        topics your bookmarks need that you haven't named, and adding them
+                           (--pool: just list the bookmarks; --last: decide on the last run again)
     scatha run             import a batch now (same as the schedule; --preview, --batch N)
     scatha setup [step]    the setup wizard (x-login, topics, schedule, status, unschedule)
 
@@ -55,7 +56,11 @@ def main(argv: list[str] | None = None) -> int:
         return review.main(app.load_config(), args["rebuild"], args["import_file"], args["browser"], onboard.say)
     if cmd == "discover":
         from . import discover, onboard
-        discover.run(app.load_config(), onboard.say, pool_only="--pool" in argv)
+        cfg = app.load_config()
+        result = (discover.last(cfg, onboard.say) if "--last" in argv
+                  else discover.run(cfg, onboard.say, pool_only="--pool" in argv))
+        if result and sys.stdin.isatty():
+            discover.decide_each(cfg, result, onboard)
         return 0
     if cmd == "run":
         from . import run

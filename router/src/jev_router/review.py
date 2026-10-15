@@ -292,7 +292,7 @@ def sorted_unsorted(cfg: dict, tax: Taxonomy) -> tuple[dict[str, str], list[str]
 
 def finish_sorting(cfg: dict, say=print, ask=None) -> int:
     """Offer to write full notes for Unsorted bookmarks given a topic, and remove the ones marked Don't keep."""
-    from . import notes as notes_mod, report, unsorted
+    from . import report, unsorted
     tax = Taxonomy.load(app.taxonomy_path(cfg))
     to_write, to_remove = sorted_unsorted(cfg, tax)
     ask = ask or (lambda q: input(f"  {q} [Y/n] ").strip().lower() in ("", "y", "yes"))
@@ -304,29 +304,39 @@ def finish_sorting(cfg: dict, say=print, ask=None) -> int:
         say(f"  Removed {len(to_remove)} light notes.")
     if to_write and ask(f"Write full notes for the {len(to_write)} bookmarks you sorted out of Unsorted? "
                         f"(Haiku, about 2,000 Claude tokens each)"):
-        app.haiku_env(cfg)
-        bookmarks = collect_bookmarks(app.work())
-        scores = {}
-        if deck_path().exists():
-            scores = {i["id"]: i["scores"] for i in json.loads(deck_path().read_text(encoding="utf-8"))["items"]}
-        work_dir = tuning() / "desk" / "sorted"
-        work_dir.mkdir(parents=True, exist_ok=True)
-        ids = [i for i in to_write if i in bookmarks]
-        (work_dir / "pending.json").write_text(json.dumps({"bookmarks": [bookmarks[i] for i in ids]}), encoding="utf-8")
-        (work_dir / "routes.json").write_text(json.dumps(
-            [{"item_id": i, "status": "route", "primary": to_write[i], "topics": scores.get(i) or {to_write[i]: 0.0}}
-             for i in ids]), encoding="utf-8")
-        result = notes_mod.cmd_write(argparse.Namespace(
-            pending=str(work_dir / "pending.json"), routes=str(work_dir / "routes.json"),
-            taxonomy=str(app.taxonomy_path(cfg)), out=str(work_dir / "preview"), ids=None, to_vault=True))
-        written = {i: topic for i, topic, _ in result["written"]} | {i: to_write[i] for i in result["present"]}
-        for i in written:
-            if i in light:
-                light[i].unlink(missing_ok=True)
-        set_ledger(app.work(), written)
-        done = len(result["written"])
-        say(f"  {done} full notes written" + (f"; {len(result['failed'])} failed (try again later)." if result["failed"] else "."))
+        done = write_up(cfg, to_write, say)
     report.write_note(cfg)
+    return done
+
+
+def write_up(cfg: dict, to_write: dict[str, str], say=print) -> int:
+    """Full notes for Unsorted bookmarks given a topic (id -> topic key): writes them into the topic's
+    folder, removes their light notes, and marks them routed in the ledger. Returns notes written."""
+    from . import notes as notes_mod, unsorted
+    tax = Taxonomy.load(app.taxonomy_path(cfg))
+    light = unsorted.notes_by_id(unsorted.folder(cfg, tax))
+    app.haiku_env(cfg)
+    bookmarks = collect_bookmarks(app.work())
+    scores = {}
+    if deck_path().exists():
+        scores = {i["id"]: i["scores"] for i in json.loads(deck_path().read_text(encoding="utf-8"))["items"]}
+    work_dir = tuning() / "desk" / "sorted"
+    work_dir.mkdir(parents=True, exist_ok=True)
+    ids = [i for i in to_write if i in bookmarks]
+    (work_dir / "pending.json").write_text(json.dumps({"bookmarks": [bookmarks[i] for i in ids]}), encoding="utf-8")
+    (work_dir / "routes.json").write_text(json.dumps(
+        [{"item_id": i, "status": "route", "primary": to_write[i], "topics": scores.get(i) or {to_write[i]: 0.0}}
+         for i in ids]), encoding="utf-8")
+    result = notes_mod.cmd_write(argparse.Namespace(
+        pending=str(work_dir / "pending.json"), routes=str(work_dir / "routes.json"),
+        taxonomy=str(app.taxonomy_path(cfg)), out=str(work_dir / "preview"), ids=None, to_vault=True))
+    written = {i: topic for i, topic, _ in result["written"]} | {i: to_write[i] for i in result["present"]}
+    for i in written:
+        if i in light:
+            light[i].unlink(missing_ok=True)
+    set_ledger(app.work(), written)
+    done = len(result["written"])
+    say(f"  {done} full notes written" + (f"; {len(result['failed'])} failed (try again later)." if result["failed"] else "."))
     return done
 
 
