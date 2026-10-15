@@ -43,14 +43,25 @@ On schedule (default: Saturdays at 00:01), the runner:
 1. Checks that your X login, Jev, and the note writer all answer. If one doesn't, it stops before fetching and tells you which: in the log, and in a phone ping if you set up ntfy.
 2. Fetches up to *batch size* bookmarks you haven't processed yet, newest first. Threads, quoted posts, linked articles, and images come along.
 3. Reads the images on posts that are mostly pictures.
-4. Asks Jev which topic each bookmark fits. Below the threshold on every topic means skipped.
-5. Writes a note per kept bookmark into that topic's folder. A bookmark that already has a note (same `tweet_id` in the folder) isn't written twice.
+4. Asks Jev which topic each bookmark fits. Below the threshold on every topic means unsorted.
+5. Writes a note per kept bookmark into that topic's folder. A bookmark that already has a note (same `tweet_id` in the folder) isn't written twice. Unsorted bookmarks become light notes in your Unsorted folder: the post, its links, the text in its images, the full text and Jev's scores, with no model call. Set `"unsorted": {"mode": "off"}` in `config.json` to keep only the ledger line instead.
 6. Records everything it handled in the ledger. A note that failed stays out, so the next run retries it.
-7. Logs a one-line summary (and pings it, if ntfy is set).
+7. Logs a one-line summary (and pings it, if ntfy is set), adds a line to `work/runs.jsonl`, and rewrites the status note in your vault (`scatha.md` beside the Unsorted folder, or wherever `status_note` in `config.json` says).
 
 If a run is interrupted after fetching, the next run resumes that batch instead of fetching a new one.
 
-## 3. Run it now
+## 3. See what happened, run it now
+
+Type `scatha`. It shows the last run, what's in Unsorted, what failed and will retry, what's still queued, and the levers that apply right now. Opening it (or the desk) counts as having looked: until then, every other `scatha` command starts with a one-line "since you last looked" reminder.
+
+| Command | Does |
+|---|---|
+| `scatha` | The report above |
+| `scatha review` | The sorting desk: sort Unsorted bookmarks, check Jev's close calls. When you press Done, it offers to write full notes for anything you sorted out of Unsorted and to remove the ones you marked Don't keep |
+| `scatha run` | A run now (same options as below) |
+| `scatha setup` | The setup wizard (`scatha setup topics`, `scatha setup x-login`, ...) |
+
+The wizard installs the command (`uv tool install --editable <repo>/router`); if you skipped that, `uv run --project <repo>/router scatha` does the same.
 
 Don't want to wait for Saturday?
 
@@ -105,7 +116,7 @@ A note that links a GitHub repo also carries that repo's vital signs: `repo`, `r
 - `yes_means`: what counts, with concrete kinds of posts
 - `no_means`: what doesn't, *especially* the near-misses that belong to your other topics
 
-**The sorting desk shows you where Jev is torn.** Run `setup review`. The first time, it re-scores every bookmark scatha has processed against your current topics (Jev only: a few cents, about 2,300 tokens a bookmark), then opens a page in your browser. The page runs on your machine and nobody else can reach it. It opens on the close calls: bookmarks where two topics scored almost the same, or where the best score sits near the keep/drop line. For each one, click the topic it belongs in, **Don't keep**, or **Not sure**. Each click is saved right away to `tuning/verdicts.json` in your data folder; anything you don't click doesn't count. Posts that aren't in English are shown in English (the note's translation if there is a note, otherwise one Haiku translation, kept for next time), with the original a click away. Keys: `j`/`k` to move, `1`-`9` for a topic, `0` don't keep, `u` not sure. After you edit `topics.yaml`, run `setup review --rebuild` to re-score. Your answers are the test any rewording has to pass: `uv run --project router python router/regression/score.py <routes.json> ~/.scatha/tuning/verdicts.json`.
+**The sorting desk shows you where Jev is torn.** Run `scatha review`. The first time, it re-scores every bookmark scatha has processed against your current topics (Jev only: a few cents, about 2,300 tokens a bookmark), then opens a page in your browser. The page runs on your machine and nobody else can reach it. It opens on the close calls: bookmarks where two topics scored almost the same, or where the best score sits near the keep/drop line. For each one, click the topic it belongs in, **Don't keep**, or **Not sure**. Each click is saved right away to `tuning/verdicts.json` in your data folder; anything you don't click doesn't count. Posts that aren't in English are shown in English (the note's translation if there is a note, otherwise one Haiku translation, kept for next time), with the original a click away. Keys: `j`/`k` to move, `1`-`9` for a topic, `0` don't keep, `u` not sure. After you edit `topics.yaml`, run `scatha review --rebuild` to re-score. Otherwise the desk keeps its scores and only scores bookmarks processed since. Your answers are the test any rewording has to pass: `uv run --project router python router/regression/score.py <routes.json> ~/.scatha/tuning/verdicts.json`.
 
 When a bookmark lands in the wrong place, open that run's `work/runs/<date>/routes.md` to see every score, then fix the wording. Some patterns that work:
 

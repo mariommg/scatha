@@ -122,7 +122,7 @@ def test_topic_folders_are_reviewed_before_saving(home, tmp_path, monkeypatch, c
     monkeypatch.setattr(onboard.vaults, "find_vaults", lambda: [vault])
     picked = [{"label": "AI", "preset": True, "destination": str(vault / "AI")},
               {"label": "General knowledge", "preset": True, "destination": str(vault / "TLM")}]
-    answers(monkeypatch, "2", "1", "TIL", "")  # change row 2: same vault, fix the typo; then save
+    answers(monkeypatch, "2", "1", "TIL", "", "")  # change row 2: same vault, fix the typo; then save; Unsorted as suggested
     assert onboard.step_topics(app.load_config(), picked, draft=False)
     out = capsys.readouterr().out
     assert "TLM" in out and "(new)" in out  # the typo was on screen, flagged as a folder that doesn't exist
@@ -135,9 +135,20 @@ def test_new_topics_default_to_one_vault_with_a_subfolder_each(home, tmp_path, m
     vault.mkdir()
     monkeypatch.setattr(onboard.vaults, "find_vaults", lambda: [vault])
     picked = [{"label": "AI", "preset": True}, {"label": "Journalism", "preset": True}]
-    answers(monkeypatch, "1", "")  # the vault, then save the review as shown
+    answers(monkeypatch, "1", "", "")  # the vault, then save the review as shown, then Unsorted as suggested
     assert onboard.step_topics(app.load_config(), picked, draft=False)
     assert [t.destination for t in Taxonomy.load(home / "topics.yaml").topics] == [str(vault / "AI"), str(vault / "Journalism")]
+    assert app.load_config()["unsorted"] == {"mode": "light", "folder": str(vault / "Unsorted")}
+
+
+def test_unsorted_can_go_anywhere_or_nowhere(home, tmp_path, monkeypatch):
+    elsewhere = tmp_path / "Other vault" / "Inbox"
+    answers(monkeypatch, str(elsewhere))
+    onboard.step_unsorted(app.load_config(), [tmp_path / "Notes" / "AI"])
+    assert app.load_config()["unsorted"] == {"mode": "light", "folder": str(elsewhere)}
+    answers(monkeypatch, "-")
+    onboard.step_unsorted(app.load_config(), [tmp_path / "Notes" / "AI"])
+    assert app.load_config()["unsorted"]["mode"] == "off"
 
 
 def test_wizard_points_at_the_setup_script_not_a_bare_command(monkeypatch):

@@ -14,9 +14,10 @@ It runs while you sleep. You wake up to notes.
 
 1. **Fetch.** [Smaug](https://github.com/alexknowshtml/smaug) pulls new bookmarks through your own X session, expands links, grabs article text, follows threads and quoted posts, and collects images.
 2. **Read images.** Posts that are mostly screenshots get their images read by Claude Haiku, so a story told in four photos counts as a story.
-3. **Sort.** [Jev](https://typesafe.ai), a small, fast judgment model from TypeSafe, asks one yes/no question per topic ("Is this about AI?") and the bookmark goes to the topic it scores highest on. Nothing fits? It's skipped. That's how the junk stays out.
+3. **Sort.** [Jev](https://typesafe.ai), a small, fast judgment model from TypeSafe, asks one yes/no question per topic ("Is this about AI?") and the bookmark goes to the topic it scores highest on. Nothing fits? It goes to an Unsorted folder as a light note (the post and its links, no summary, no cost), so nothing disappears. Sort those whenever you like, or tell scatha they're not worth keeping.
 4. **Write.** Claude Haiku writes the note. Haiku picks the quotes; the code copies them out of the source. Each one shows the source's own words as whole sentences with nothing cut out, so a quoted half-sentence can't lose the "I don't think" in front of it. A quote Haiku can't point to in the source is dropped.
 5. **Remember.** Every processed bookmark goes in a ledger, so nothing is done twice and a note that failed gets retried next run.
+6. **Tell you.** A run at midnight reports to nobody, so scatha leaves a status note in your vault, and typing `scatha` shows what happened and what you can do about it.
 
 ## What you need
 
@@ -42,7 +43,7 @@ powershell -ExecutionPolicy Bypass -File setup.ps1 --answers $HOME\Downloads\my-
 
 Or skip the planner and run `setup.ps1` / `./setup.sh` with no arguments; the wizard asks everything itself.
 
-The wizard checks your tools, asks for your X cookies and API keys in hidden prompts, confirms each one actually works, finds your Obsidian vaults, installs the schedule, and offers a test drive on your five newest bookmarks (into a preview folder, so nothing lands in your vault until you've seen it).
+The wizard checks your tools, asks for your X cookies and API keys in hidden prompts, confirms each one actually works, finds your Obsidian vaults, installs the schedule, and offers a test drive on your five newest bookmarks (into a preview folder, so nothing lands in your vault until you've seen it). At the end it offers to install the `scatha` command. After that, type `scatha` any time to see what happened; `scatha review` opens the sorting desk.
 
 ## What it costs
 
@@ -65,8 +66,16 @@ What leaves your computer: your X session talks to X (it's your login, used the 
 - **X can change under us.** Smaug reads X with a copy of the client code from [bird](https://www.npmjs.com/package/@steipete/bird), kept in `smaug/vendor/bird/`. bird's author has stopped maintaining it, so when X changes its internals, the fix lands here, not upstream. If you also install bird 0.8.0, it's tried as a backup whenever the built-in client fails.
 - **This uses your X session cookies** for automated reading, which X's terms don't love. It only reads your own bookmarks, at a modest pace, but it's your account and your call.
 - **Windows is the tested path.** The macOS (launchd) and Linux (systemd) schedulers are written to spec and haven't had their first real run yet. If you're the first, tell me how it went. On a Linux server, run `loginctl enable-linger $USER` once, or the schedule stops when you log out; [the runbook](docs/RUNBOOK.md#on-a-server-with-no-screen-linux-over-ssh) covers the rest of a no-screen install.
-- **Video is invisible.** A post whose substance is a video gets a short, honest note that says so, plus the link.
-- **Sorting is good, not perfect.** On my reviewed sample, Jev's call matched mine 14 times out of 15. Your topics, your wording, your mileage.
+- **Sorting is good, not perfect, and topics blur.** On the first 15 bookmarks I reviewed, Jev matched me 14 times. On 60 close calls I picked out because they were hard, it matched me 36 times, and I wasn't always consistent either. So every note lists every topic it fits, not just the folder it's in, and nothing Jev can't place is thrown away. Your topics, your wording, your mileage.
+
+## What scatha isn't good at
+
+Some things it can't see, so it can't sort them well. Knowing them saves you from blaming your topics:
+
+- **Video.** Only photos are read. A post whose point is a video is judged on its caption, which is why most memes and jokes land in Unsorted.
+- **Replies under a post.** A thread by the author comes along; replies the author adds under someone else's post, or later comments, don't.
+- **Paywalls.** A paywalled article gives scatha its title and summary, nothing more.
+- **Deleted accounts.** A bookmark from an account that's gone can't be read at all.
 
 ## When something breaks
 

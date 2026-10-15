@@ -468,6 +468,45 @@ def step_topics(cfg: dict, preset_topics: list[dict] | None = None, draft: bool 
     path = topics.write_taxonomy(built, app.taxonomy_path(cfg))
     ok(f"{len(built)} topics saved to {path}")
     hint("Plain YAML. Open it any time to adjust wording or folders.")
+    step_unsorted(cfg, [Path(t["destination"]) for t in built])
+    return True
+
+
+def step_unsorted(cfg: dict, destinations: list[Path], preset: str | None = None) -> None:
+    """Where bookmarks that fit no topic go. Nothing is assumed: the suggestion is only a default."""
+    from collections import Counter
+    parents = Counter(str(d.parent) for d in destinations)
+    suggested = str(Path(parents.most_common(1)[0][0]) / "Unsorted") if parents else str(app.home() / "Unsorted")
+    current = (cfg.get("unsorted") or {}).get("folder") or suggested
+    say()
+    question("Bookmarks that fit none of your topics")
+    hint("They go to an Unsorted folder as light notes: the post and its links, no summary, no model cost. Nothing")
+    hint(f"disappears, and you can sort them later with `{app.command('review')}`. Any folder works, in any vault.")
+    hint("Type - to keep no notes for them (they're only listed in the ledger).")
+    choice = preset if preset is not None else ask("Folder for them", current, clearable=True)
+    cfg["unsorted"] = {"mode": "light", "folder": str(Path(choice).expanduser())} if choice else {"mode": "off", "folder": ""}
+    app.save_config(cfg)
+    ok(f"Unsorted: {cfg['unsorted']['folder']}" if choice else "Unsorted: off (ledger only)")
+
+
+def install_command() -> bool:
+    """Put `scatha` on PATH (uv tool, editable, so it follows this checkout)."""
+    import shutil
+    import subprocess
+    if shutil.which(app.APP_NAME):
+        return True
+    say()
+    question(f"Install the `{app.APP_NAME}` command?")
+    hint(f"Then `{app.APP_NAME}` works from any folder: it shows what happened and what you can do.")
+    if not yes(f"Install `{app.APP_NAME}` now (uv tool install)?"):
+        return False
+    proc = subprocess.run(["uv", "tool", "install", "--force", "--editable", str(app.REPO / "router")],
+                          capture_output=True, text=True)
+    if proc.returncode != 0:
+        bad(f"Couldn't install it: {(proc.stderr or proc.stdout).strip()[-200:]}")
+        return False
+    subprocess.run(["uv", "tool", "update-shell"], capture_output=True, text=True)
+    ok(f"Installed. Open a new terminal, then type `{app.APP_NAME}`.")
     return True
 
 
@@ -697,14 +736,17 @@ def onboard(answers: dict, verify: bool = True) -> int:
         if not run_step(n, cfg, answers, verify):
             return 1
     run_step(7, cfg, answers, verify)
+    installed = install_command()
     say()
     say(cyan("All set."))
-    say(f"  Handy later, from {app.REPO}:")
+    say("  Handy later" + ("" if installed else f", from {app.REPO}") + ":")
     say()
+    c = (lambda sub: f"{app.APP_NAME} {sub}".strip()) if installed else (lambda sub: app.command(sub))
     table(["Command", "What it does"], [
-        [setup_cmd(), "check everything; fix what's broken, change anything"],
-        [setup_cmd("status"), "check everything, change nothing; newest log"],
-        [setup_cmd("x-login"), "fresh X cookies, straight away"],
+        [c(""), "what happened in the last runs, and what you can do about it"],
+        [c("review"), "sort Unsorted bookmarks; check Jev's closest calls"],
+        [c("setup"), "check everything; fix what's broken, change anything"],
+        [c("setup x-login"), "fresh X cookies, straight away"],
     ])
     say()
     hint("The runbook (docs/RUNBOOK.md) covers the rest.")

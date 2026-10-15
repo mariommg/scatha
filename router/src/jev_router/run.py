@@ -22,7 +22,7 @@ import subprocess
 import sys
 import urllib.request
 
-from . import Taxonomy, app, checks, notes
+from . import Taxonomy, app, checks, notes, report, unsorted
 from .smaug import route_file
 
 # Minimum days between runs per cadence. Schedulers that can't express "every two
@@ -114,16 +114,23 @@ def append_ledger(lines: list[str]) -> None:
         f.write("".join(line + "\n" for line in lines))
 
 
-def summary_text(written: list, skipped: int, failed: int, remaining: int | None, labels: dict) -> str:
+def summary_text(written: list, skipped: int, failed: int, remaining: int | None, labels: dict,
+                 mode: str = "light") -> str:
     counts = collections.Counter(b for _, b, _ in written)
     parts = ", ".join(f"{n} {labels.get(b, b)}" for b, n in counts.most_common())
     text = f"Bookmark import: {len(written)} new notes ({parts or 'none'})."
     if skipped:
-        text += f" {skipped} didn't fit your topics."
+        if mode != "off":
+            where = "they're in Unsorted" if skipped > 1 else "it's in Unsorted"
+        else:
+            where = "they weren't kept" if skipped > 1 else "it wasn't kept"
+        text += f" {skipped} didn't fit your topics; {where}."
     if failed:
         text += f" {failed} failed and will retry next run."
     if remaining:
         text += f" {remaining} older bookmarks still queued."
+    if skipped or failed:
+        text += f" Type `{app.command()}` for the full report and what you can do."
     return text
 
 
@@ -210,6 +217,15 @@ def main(argv: list[str] | None = None) -> int:
             pending=str(pending), routes=str(run_dir / "routes.json"), taxonomy=str(tax_path),
             out=str(w / "notes-preview"), ids=None, to_vault=not args.preview))
 
+        # 5b. Bookmarks that fit no topic: light notes in Unsorted (no model cost), unless turned off
+        skips = [r for r in results if r.status == "skip"]
+        if skips and unsorted.mode(cfg) != "off":
+            where = unsorted.folder(cfg, tax)
+            if args.preview:
+                where = w / "notes-preview" / where.name
+            made = unsorted.write([(bookmarks[r.item_id], r.topics) for r in skips], where, tax)
+            log(f"{len(made)} light notes in {where} for bookmarks that fit no topic")
+
         # 6. Ledger: everything handled. Failed notes and routing errors stay out and come back next run.
         if not args.preview:
             done = {i for i, _, _ in summary["written"]} | set(summary["present"])
@@ -223,7 +239,12 @@ def main(argv: list[str] | None = None) -> int:
         # 7. Summary
         labels = {t.key: t.label or t.key.replace("_", " ") for t in tax.topics}
         failed = len(summary["failed"]) + sum(r.status == "error" for r in results) + len(unread)
-        ping(cfg, summary_text(summary["written"], sum(r.status == "skip" for r in results), failed, remaining, labels))
+        if not args.preview:
+            report.record_run(dict(collections.Counter(b for _, b, _ in summary["written"])), len(skips),
+                              failed, remaining, unsorted.mode(cfg))
+            note = report.write_note(cfg)
+            log(f"status note: {note}" if note else "status note: could not write it")
+        ping(cfg, summary_text(summary["written"], len(skips), failed, remaining, labels, unsorted.mode(cfg)))
         log(f"note-writer tokens this run: {summary['tokens']:,}")
         return 1 if failed else 0
     finally:

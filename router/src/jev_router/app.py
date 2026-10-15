@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import stat
 import sys
 from pathlib import Path
@@ -44,6 +45,10 @@ DEFAULT_CONFIG = {
     "reader_profile": "",  # a sentence about you; Haiku tailors how-to steps to it
     "schedule": {"cadence": "weekly", "day": "Saturday", "time": "00:01"},
     "tools": {"node": "node", "bird": "bird", "claude": "claude"},
+    # Bookmarks that fit no topic: "light" notes (no model cost) in this folder, or "off" (ledger only).
+    # An empty folder means "Unsorted" beside most of the topic folders.
+    "unsorted": {"mode": "light", "folder": ""},
+    "status_note": "",  # the vault note each run rewrites; empty: "scatha.md" beside the Unsorted folder
 }
 
 
@@ -62,6 +67,14 @@ def task_name() -> str:
 def setup_command(sub: str = "") -> str:
     """How the user runs setup on this OS, from the project folder (there is no command on PATH)."""
     return ((r".\setup.ps1" if sys.platform == "win32" else "./setup.sh") + f" {sub}").rstrip()
+
+
+def command(sub: str = "") -> str:
+    """What to tell the user to type: `scatha <sub>` once the command is installed, else the long form that always works."""
+    exe = APP_NAME + (".exe" if sys.platform == "win32" else "")
+    if shutil.which(APP_NAME) or (Path.home() / ".local" / "bin" / exe).exists():
+        return f"{APP_NAME} {sub}".strip()
+    return f'uv run --project "{REPO / "router"}" {APP_NAME} {sub}'.strip()
 
 
 def work() -> Path:

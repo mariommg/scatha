@@ -12,6 +12,7 @@ note, otherwise one Haiku translation, cached. Jev always scores the original.
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import datetime as dt
 import html
@@ -211,14 +212,25 @@ async def score(bookmarks: dict[str, dict], tax: Taxonomy) -> list:
     return await Router(tax).route_many(items)
 
 
-def build(cfg: dict, say=print) -> dict:
+def build(cfg: dict, say=print, reuse: bool = False) -> dict:
+    """Score every processed bookmark. reuse=True keeps the scores already on the desk (same topics)
+    and scores only bookmarks processed since, so opening the desk after a run costs pennies or nothing."""
+    from types import SimpleNamespace
     tax_path = app.taxonomy_path(cfg)
     tax = Taxonomy.load(tax_path)
     bookmarks = collect_bookmarks(app.work())
     if not bookmarks:
         raise SystemExit("  No processed bookmarks yet. The desk fills up after the first real run.")
-    say(f"  Scoring {len(bookmarks)} bookmarks against your {len(tax.topics)} topics with Jev (a few cents)...")
-    results = asyncio.run(score(bookmarks, tax))
+    kept = []
+    if reuse and deck_path().exists():
+        old = json.loads(deck_path().read_text(encoding="utf-8"))
+        if old.get("topics_hash") == desk.topics_hash(topic_list(tax)):
+            kept = [SimpleNamespace(item_id=i["id"], topics=i["scores"], primary=i["placed"], status=i["status"],
+                                    input_tokens=0, error=None) for i in old["items"] if i["id"] in bookmarks]
+    fresh = {i: b for i, b in bookmarks.items() if i not in {k.item_id for k in kept}}
+    if fresh:
+        say(f"  Scoring {len(fresh)} bookmarks against your {len(tax.topics)} topics with Jev (a few cents)...")
+    results = kept + (asyncio.run(score(fresh, tax)) if fresh else [])
     errors = [r for r in results if r.status == "error"]
     if errors:
         say(f"  {len(errors)} couldn't be scored and are left off (first: {errors[0].error[:120]}).")
@@ -244,8 +256,80 @@ def build(cfg: dict, say=print) -> dict:
             "tokens": sum(r.input_tokens or 0 for r in results)}
     desk._write_json(deck_path(), deck)
     close = sum(1 for it in items if it["close"])
-    say(f"  Desk built: {len(items)} items, {close} close calls ({deck['tokens']:,} Jev input tokens).")
+    say(f"  Desk ready: {len(items)} items, {close} close calls"
+        + (f" ({deck['tokens']:,} Jev input tokens)." if deck["tokens"] else ", no new scoring needed."))
     return deck
+
+
+# ---------- after the desk: Unsorted bookmarks you sorted ----------
+
+def set_ledger(work: Path, changes: dict[str, str]) -> None:
+    """Mark bookmarks as routed to a topic in the ledger (id -> topic key), keeping each line's date."""
+    path = work / "ingested.md"
+    lines = path.read_text(encoding="utf-8").splitlines()
+    for n, line in enumerate(lines):
+        m = re.search(r"status/(\d+)", line)
+        if m and m.group(1) in changes:
+            parts = [p.strip() for p in line.split("|")]
+            if len(parts) >= 3:
+                lines[n] = f"{parts[0]} | {parts[1]} | route | {changes[m.group(1)]}"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def sorted_unsorted(cfg: dict, tax: Taxonomy) -> tuple[dict[str, str], list[str]]:
+    """Verdicts on bookmarks the run didn't file: {id: topic} to write up, [ids] marked Don't keep."""
+    from . import unsorted
+    led = ledger(app.work())
+    store = desk.Verdicts(verdicts_path()).load()
+    keys = {t.key for t in tax.topics}
+    light = unsorted.notes_by_id(unsorted.folder(cfg, tax))
+    to_write = {i: v["verdict"] for i, v in store.items()
+                if v.get("verdict") in keys and led.get(i, {}).get("status") == "skip"}
+    to_remove = [i for i, v in store.items() if v.get("verdict") == desk.DROP and i in light]
+    return to_write, to_remove
+
+
+def finish_sorting(cfg: dict, say=print, ask=None) -> int:
+    """Offer to write full notes for Unsorted bookmarks given a topic, and remove the ones marked Don't keep."""
+    from . import notes as notes_mod, report, unsorted
+    tax = Taxonomy.load(app.taxonomy_path(cfg))
+    to_write, to_remove = sorted_unsorted(cfg, tax)
+    ask = ask or (lambda q: input(f"  {q} [Y/n] ").strip().lower() in ("", "y", "yes"))
+    light = unsorted.notes_by_id(unsorted.folder(cfg, tax))
+    done = 0
+    if to_remove and ask(f"Remove the {len(to_remove)} Unsorted notes you marked Don't keep?"):
+        for i in to_remove:
+            light[i].unlink(missing_ok=True)
+        say(f"  Removed {len(to_remove)} light notes.")
+    if to_write and ask(f"Write full notes for the {len(to_write)} bookmarks you sorted out of Unsorted? "
+                        f"(Haiku, about 2,000 Claude tokens each)"):
+        app.load_secrets()
+        os.environ["CLAUDE_BIN"] = cfg["tools"]["claude"]
+        os.environ["NOTES_BACKEND"] = cfg["notes_backend"]
+        os.environ["READER_PROFILE"] = cfg.get("reader_profile", "")
+        bookmarks = collect_bookmarks(app.work())
+        scores = {}
+        if deck_path().exists():
+            scores = {i["id"]: i["scores"] for i in json.loads(deck_path().read_text(encoding="utf-8"))["items"]}
+        work_dir = tuning() / "desk" / "sorted"
+        work_dir.mkdir(parents=True, exist_ok=True)
+        ids = [i for i in to_write if i in bookmarks]
+        (work_dir / "pending.json").write_text(json.dumps({"bookmarks": [bookmarks[i] for i in ids]}), encoding="utf-8")
+        (work_dir / "routes.json").write_text(json.dumps(
+            [{"item_id": i, "status": "route", "primary": to_write[i], "topics": scores.get(i) or {to_write[i]: 0.0}}
+             for i in ids]), encoding="utf-8")
+        result = notes_mod.cmd_write(argparse.Namespace(
+            pending=str(work_dir / "pending.json"), routes=str(work_dir / "routes.json"),
+            taxonomy=str(app.taxonomy_path(cfg)), out=str(work_dir / "preview"), ids=None, to_vault=True))
+        written = {i: topic for i, topic, _ in result["written"]} | {i: to_write[i] for i in result["present"]}
+        for i in written:
+            if i in light:
+                light[i].unlink(missing_ok=True)
+        set_ledger(app.work(), written)
+        done = len(result["written"])
+        say(f"  {done} full notes written" + (f"; {len(result['failed'])} failed (try again later)." if result["failed"] else "."))
+    report.write_note(cfg)
+    return done
 
 
 # ---------- verdicts from older reviews ----------
@@ -280,15 +364,17 @@ def main(cfg: dict, rebuild: bool = False, import_file: str | None = None, open_
     tax = Taxonomy.load(app.taxonomy_path(cfg))
     current = desk.topics_hash(topic_list(tax))
     deck_file = deck_path()
-    if rebuild or not deck_file.exists():
+    stale = deck_file.exists() and json.loads(deck_file.read_text(encoding="utf-8")).get("topics_hash") != current
+    if stale and not rebuild:
+        say(f"  Your topics changed since the desk was built; `{app.command('review --rebuild')}` re-scores everything.")
+    else:
         app.load_secrets()
         os.environ["CLAUDE_BIN"] = cfg["tools"]["claude"]
         os.environ["NOTES_BACKEND"] = cfg["notes_backend"]
-        build(cfg, say)
-    elif json.loads(deck_file.read_text(encoding="utf-8")).get("topics_hash") != current:
-        say(f"  Your topics changed since the desk was built; run {app.setup_command('review --rebuild')} to re-score.")
+        build(cfg, say, reuse=not rebuild)
     store = desk.Verdicts(verdicts_path())
     if import_file:
         import_legacy(Path(import_file), tax, store, say)
     desk.serve(deck_file, verdicts_path(), current, open_browser, say)
+    finish_sorting(cfg, say)
     return 0

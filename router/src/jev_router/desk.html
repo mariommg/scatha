@@ -136,7 +136,7 @@ details.extra .quote { margin-top: 6px; }
       <h1 id="title">Sorting Desk</h1>
       <button class="btn primary" id="done" type="button">Done</button>
     </div>
-    <p class="lede">For each item, click the topic it belongs in. Pick <b>Don't keep</b> if it fits none of them, or <b>Not sure</b> if you're torn (a note helps). Only what you click counts: an item you leave alone is not taken as agreeing with Jev. Each click is saved right away.</p>
+    <p class="lede">For each item, click the topic it belongs in. Pick <b>Don't keep</b> if it fits none of them, or <b>Not sure</b> if you're torn (a note helps). Only what you click counts: an item you leave alone is not taken as agreeing with Jev. Each click is saved right away. Sorting a bookmark out of <b>Unsorted</b> writes its full note when you press Done (you'll be asked first in the terminal).</p>
     <p class="banner" id="stale" hidden>Your topic definitions changed after these scores were made. The scores below are for the old definitions. Close the desk and rebuild it to re-score.</p>
     <p class="banner bad" id="fatal" hidden></p>
   </header>
@@ -239,6 +239,7 @@ function renderTopics() {
 
 const FILTERS = [
   ["close", "Close calls", (it) => it.close],
+  ["unsorted", "Unsorted", (it) => !it.filed],
   ["open", "Unanswered", (it) => !verdicts[it.id]?.verdict],
   ["done", "Answered", (it) => !!verdicts[it.id]?.verdict],
   ["all", "All", () => true],
@@ -265,9 +266,9 @@ function render() {
 }
 
 function updateProgress() {
-  const scope = filter === "close" ? deck.items.filter((i) => i.close) : deck.items;
+  const scope = filter === "close" ? deck.items.filter((i) => i.close) : filter === "unsorted" ? deck.items.filter((i) => !i.filed) : deck.items;
   const n = scope.filter((i) => verdicts[i.id]?.verdict).length;
-  $("prog").textContent = `${n} of ${scope.length} ${filter === "close" ? "close calls" : "items"} answered`;
+  $("prog").textContent = `${n} of ${scope.length} ${filter === "close" ? "close calls" : filter === "unsorted" ? "unsorted" : "items"} answered`;
   $("meter").style.width = scope.length ? `${(100 * n) / scope.length}%` : "0";
   const errs = [...saving.values()].filter((s) => s === "error").length;
   const busy = [...saving.values()].filter((s) => s === "saving").length + queued.size;
@@ -280,7 +281,7 @@ function closeTag(it) {
   const tags = [];
   if (it.pair) tags.push(el("span", { class: "pill close" }, `${label(it.pair[0])} vs ${label(it.pair[1])}, ${it.gap.toFixed(2)} apart`));
   if (it.near_cut) tags.push(el("span", { class: "pill close" }, "near the keep/drop line"));
-  tags.push(el("span", { class: "pill" }, it.filed ? `filed in ${label(it.filed)}` : "was dropped"));
+  tags.push(el("span", { class: "pill" }, it.filed ? `filed in ${label(it.filed)}` : "in Unsorted"));
   if (it.language) tags.push(el("span", { class: "pill lang" }, `translated from ${langName(it.language)}`));
   return tags;
 }
@@ -469,7 +470,7 @@ $("done").onclick = async () => {
   closed = true;
   const answered = Object.values(verdicts).filter((v) => v.verdict).length;
   $("app").replaceChildren(el("div", { class: "closed" }, el("h1", {}, "Desk closed"),
-    el("p", { class: "lede" }, `${answered} answers are saved in ${window.VERDICTS_PATH}. You can close this tab.`)));
+    el("p", { class: "lede" }, `${answered} answers are saved in ${window.VERDICTS_PATH}. Check the terminal: if you sorted anything out of Unsorted, it asks whether to write those notes now. You can close this tab.`)));
 };
 
 load();
