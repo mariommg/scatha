@@ -10,7 +10,7 @@ import { x } from '../src/x.js';
 // when one bookmark of several can't be prepared.
 describe('fetchAndPrepareBookmarks with a bookmark that fails to prepare', () => {
   const ENV = ['ARCHIVE_FILE', 'PENDING_FILE', 'STATE_FILE'];
-  let dir, saved, realBookmarks;
+  let dir, saved, realBookmarks, realThread;
 
   const post = (id) => ({ id, text: `post ${id}`, createdAt: '2026-10-01T12:00:00Z', author: { username: 'someone' } });
   // A bookmark whose preparation throws partway (any error inside the per-bookmark try)
@@ -23,10 +23,13 @@ describe('fetchAndPrepareBookmarks with a bookmark that fails to prepare', () =>
     process.env.PENDING_FILE = path.join(dir, 'pending.json');
     process.env.STATE_FILE = path.join(dir, 'state.json');
     realBookmarks = x.bookmarks;
+    realThread = x.thread;
+    x.thread = async () => []; // every bookmark asks about its thread; none here
   });
 
   afterEach(() => {
     x.bookmarks = realBookmarks;
+    x.thread = realThread;
     for (const k of ENV) { if (saved[k] === undefined) delete process.env[k]; else process.env[k] = saved[k]; }
     fs.rmSync(dir, { recursive: true, force: true });
   });

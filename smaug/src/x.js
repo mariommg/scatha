@@ -110,8 +110,13 @@ function birdInstalled(config) {
   return birdFound.get(bird);
 }
 
+// X said "slow down". bird reads with the same cookies, so retrying there only doubles the failed calls.
+export function isRateLimit(error) {
+  return /\b429\b|rate limit/i.test(error?.message || '');
+}
+
 export function createX({ builtin = builtinBackend, bird = birdBackend, hasBird = birdInstalled, log = console.log } = {}) {
-  const counts = { builtin: 0, fallback: 0, fallbackFailed: 0, bird: 0 };
+  const counts = { builtin: 0, fallback: 0, fallbackFailed: 0, bird: 0, rateLimited: 0 };
 
   async function call(op, config, ...args) {
     const mode = (process.env.SMAUG_X_CLIENT || 'auto').toLowerCase();
@@ -125,6 +130,10 @@ export function createX({ builtin = builtinBackend, bird = birdBackend, hasBird 
       counts.builtin++;
       return out;
     } catch (error) {
+      if (isRateLimit(error)) {
+        counts.rateLimited++;
+        throw error;
+      }
       if (mode === 'builtin' || !hasBird(config)) throw error;
       log(`  X: built-in client failed on ${op} (${error.message}); falling back to bird`);
       counts.fallback++;
@@ -143,6 +152,7 @@ export function createX({ builtin = builtinBackend, bird = birdBackend, hasBird 
   }
   x.summary = () => `X client: ${counts.builtin} built-in, ${counts.fallback} bird fallbacks`
     + (counts.fallbackFailed ? ` (${counts.fallbackFailed} failed there too)` : '')
+    + (counts.rateLimited ? `, ${counts.rateLimited} rate-limited` : '')
     + (counts.bird ? `, ${counts.bird} through bird (forced)` : '');
   return x;
 }

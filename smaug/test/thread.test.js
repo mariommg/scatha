@@ -42,8 +42,13 @@ describe('fetchSelfThread', () => {
     assert.deepStrictEqual(thread.map(x => x.id), ['10', '11', '12']);
   });
 
-  test('a failed read is no thread, not a failed bookmark', async () => {
-    x.thread = async () => { throw new Error('rate limited'); };
+  test('a post X won\'t show (deleted, protected) is no thread, not a failed bookmark', async () => {
+    x.thread = async () => { throw new Error('HTTP 404: tweet not found'); };
     assert.strictEqual(await fetchSelfThread({}, { id: '10', text: 'hello', author: { username: 'tim' } }), null);
+  });
+
+  test('a rate limit fails the bookmark, so it is retried next run instead of noted from its first post', async () => {
+    x.thread = async () => { throw new Error('HTTP 429: Rate limit exceeded'); };
+    await assert.rejects(fetchSelfThread({}, { id: '10', text: 'hello', author: { username: 'tim' } }), /429/);
   });
 });

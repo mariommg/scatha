@@ -19,7 +19,7 @@ import { Readability } from '@mozilla/readability';
 import { parseHTML } from 'linkedom';
 import { loadConfig } from './config.js';
 import { safeFetch } from './safe-fetch.js';
-import { x } from './x.js';
+import { isRateLimit, x } from './x.js';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -420,6 +420,8 @@ export async function fetchSelfThread(config, bookmark) {
     const ordered = [...chain].map(id => byId.get(id)).filter(Boolean).sort((a, b) => (BigInt(a.id) < BigInt(b.id) ? -1 : 1));
     return ordered.length > 1 ? ordered : null;
   } catch (error) {
+    // Rate-limited: fail the bookmark so it's retried next run, not noted from its first post forever
+    if (isRateLimit(error)) throw error;
     console.log(`  Could not fetch thread for ${bookmark.id}: ${error.message}`);
     return null;
   }
