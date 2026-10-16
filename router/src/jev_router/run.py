@@ -115,7 +115,7 @@ def append_ledger(lines: list[str]) -> None:
 
 
 def summary_text(written: list, skipped: int, failed: int, remaining: int | None, labels: dict,
-                 mode: str = "light") -> str:
+                 mode: str = "light", new_unsorted: int = 0) -> str:
     counts = collections.Counter(b for _, b, _ in written)
     parts = ", ".join(f"{n} {labels.get(b, b)}" for b, n in counts.most_common())
     text = f"Bookmark import: {len(written)} new notes ({parts or 'none'})."
@@ -129,6 +129,9 @@ def summary_text(written: list, skipped: int, failed: int, remaining: int | None
         text += f" {failed} failed and will retry next run."
     if remaining:
         text += f" {remaining} older bookmarks still queued."
+    if new_unsorted >= report.DISCOVER_AT:
+        text += (f" {new_unsorted} bookmarks have gone to Unsorted since your topics were last checked; "
+                 f"`{app.command('discover')}` looks for a topic they share.")
     if skipped or failed:
         text += f" Type `{app.command()}` for the full report and what you can do."
     return text
@@ -247,7 +250,8 @@ def main(argv: list[str] | None = None) -> int:
                 log(f"{gone['held']} Unsorted notes disappeared at once; waiting for a yes at `{app.command()}`")
             note = report.write_note(cfg)
             log(f"status note: {note}" if note else "status note: could not write it")
-        ping(cfg, summary_text(summary["written"], len(skips), failed, remaining, labels, unsorted.mode(cfg)))
+        ping(cfg, summary_text(summary["written"], len(skips), failed, remaining, labels, unsorted.mode(cfg),
+                               0 if args.preview else report.new_unsorted()))
         log(f"note-writer tokens this run: {summary['tokens']:,}")
         return 1 if failed else 0
     finally:

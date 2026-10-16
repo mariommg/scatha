@@ -93,8 +93,24 @@ def state(cfg: dict) -> dict:
         "unsorted": unsorted.count(cfg, tax) if unsorted.mode(cfg) != "off" else 0,
         "unsorted_dir": unsorted.folder(cfg, tax), "mode": unsorted.mode(cfg),
         "failed": last["failed"] if last else 0, "remaining": last["remaining"] if last else None,
-        "held": unsorted.held_count(), "not_kept": not_kept(),
+        "held": unsorted.held_count(), "not_kept": not_kept(), "new_unsorted": new_unsorted(runs),
     }
+
+
+DISCOVER_AT = 15  # new Unsorted bookmarks since the last discovery run before discovery is suggested
+
+
+def new_unsorted(runs: list[dict] | None = None) -> int:
+    """Bookmarks sent to Unsorted since the last discovery run (all of them, if discovery never ran)."""
+    from . import discover
+    since = ""
+    if discover.runs_dir().is_dir():
+        for f in discover.runs_dir().glob("*.json"):
+            try:
+                since = max(since, json.loads(f.read_text(encoding="utf-8")).get("at") or "")
+            except (OSError, ValueError):
+                continue
+    return sum(r.get("unsorted", 0) for r in (history() if runs is None else runs) if r.get("at", "") > since)
 
 
 def not_kept() -> dict[str, int]:
@@ -132,8 +148,9 @@ LEVERS = [
     Lever("sort", lambda s: s["unsorted"] > 0,
           lambda s: f"`{app.command('review')}`: sort the {s['unsorted']} unsorted bookmarks. "
                     "Picking a topic writes the full note; Don't keep removes it."),
-    Lever("topic", lambda s: s["unsorted"] >= 10,
-          lambda s: f"`{app.command('setup topics')}`: if many unsorted bookmarks are alike, add a topic for them."),
+    Lever("discover", lambda s: s.get("new_unsorted", 0) >= DISCOVER_AT,
+          lambda s: f"`{app.command('discover')}`: {s['new_unsorted']} bookmarks have gone to Unsorted since your "
+                    "topics were last checked. See whether they share a topic you haven't named (a few cents)."),
     Lever("tune", lambda s: s["unsorted"] == 0 and bool(s["runs"]),
           lambda s: f"`{app.command('review')}`: check Jev's closest calls, so you know where your topics blur."),
     Lever("next", lambda s: (s["remaining"] or 0) > 0,

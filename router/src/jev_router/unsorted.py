@@ -57,7 +57,7 @@ def callout(scores: dict[str, float], labels: dict[str, str], line: float) -> li
         "> [!note] scatha couldn't match this to your topics",
         f"> Best guess: {guess}; a bookmark needs {line:.2f} to be filed. "
         f"To sort it, type `{app.command('review')}`: picking a topic there writes its full note.",
-        f"> If many unsorted notes are alike, you may be missing a topic: `{app.command('setup topics')}` adds one.",
+        f"> If many unsorted notes are alike, you may be missing a topic: `{app.command('discover')}` looks for one.",
     ]
 
 

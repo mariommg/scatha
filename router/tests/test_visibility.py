@@ -40,6 +40,7 @@ def test_light_note_is_valid_and_says_what_to_do(tmp_path):
     assert fm["bucket"] == "unsorted" and fm["topics"] == [] and fm["tweet_id"] == "77"
     assert fm["topic_scores"] == ["journalism 0.13", "ai 0.05"]
     assert "Best guess: Journalism (0.13)" in text and "review`" in text and "pico de gallos" in text
+    assert "discover`" in text and "setup topics" not in text  # discovery is the lever for a missing topic
 
 
 def test_light_notes_are_written_once(tmp_path):
@@ -126,7 +127,9 @@ def test_levers_only_when_they_apply(home):
     assert report.levers(s) == []  # no runs, nothing unsorted, nothing queued: say nothing
     s.update(unsorted=12, remaining=40, failed=0, runs=[{}])
     keys = [l.key for l in report.LEVERS if l.applies(s)]
-    assert keys == ["sort", "topic", "next"]
+    assert keys == ["sort", "next"]
+    s.update(new_unsorted=report.DISCOVER_AT)
+    assert [l.key for l in report.LEVERS if l.applies(s)] == ["sort", "discover", "next"]
     assert len(report.levers(s, limit=2)) == 2
 
 
@@ -338,3 +341,31 @@ def test_cli_bare_checks_for_deletions_first(home, capsys, monkeypatch):
     light["1"].unlink()
     assert cli.main([]) == 0
     assert drops("vault") == {"1"} and "Not worth keeping: 1" in capsys.readouterr().out
+
+
+# ---------- the discovery nudge ----------
+
+def test_discovery_is_suggested_once_enough_new_bookmarks_pile_up(home):
+    from jev_router import discover
+    report.record_run({"ai": 3}, report.DISCOVER_AT - 6, 0, None, "light")
+    assert report.new_unsorted() == report.DISCOVER_AT - 6
+    assert "discover" not in [l.key for l in report.LEVERS if l.applies(report.state(app.load_config()))]
+    report.record_run({"ai": 3}, 6, 0, None, "light")
+    s = report.state(app.load_config())
+    assert s["new_unsorted"] == report.DISCOVER_AT
+    [says] = [l.says(s) for l in report.LEVERS if l.key == "discover" and l.applies(s)]
+    assert says.startswith("`") and "discover`" in says and str(report.DISCOVER_AT) in says
+    # a discovery run counts as looking: the nudge waits for 15 new ones after it
+    discover.runs_dir().mkdir(parents=True)
+    import datetime as dt
+    (discover.runs_dir() / "x.json").write_text(json.dumps({"at": dt.datetime.now().isoformat(timespec="seconds")}),
+                                               encoding="utf-8")
+    assert report.new_unsorted() == 0
+
+
+def test_run_summary_mentions_discovery_only_past_the_line():
+    labels = {"ai": "AI"}
+    quiet = run.summary_text([], 3, 0, None, labels, new_unsorted=report.DISCOVER_AT - 1)
+    loud = run.summary_text([], 3, 0, None, labels, new_unsorted=report.DISCOVER_AT)
+    assert "discover" not in quiet
+    assert f"{report.DISCOVER_AT} bookmarks have gone to Unsorted" in loud and "discover`" in loud
