@@ -154,6 +154,29 @@ def load_secrets() -> None:
         os.environ.pop("CT0")
 
 
+def stored_user_vars(names: list[str]) -> list[str]:
+    """Which of these are saved as Windows user environment variables (none elsewhere: secrets.env is in the data folder)."""
+    if sys.platform != "win32":
+        return []
+    import winreg
+    found = []
+    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
+        for n in names:
+            try:
+                winreg.QueryValueEx(key, n)
+                found.append(n)
+            except FileNotFoundError:
+                pass
+    return found
+
+
+def delete_user_var(var: str) -> None:
+    import winreg
+    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_SET_VALUE) as key:
+        winreg.DeleteValue(key, var)
+    os.environ.pop(var, None)
+
+
 def haiku_env(cfg: dict) -> None:
     """Point notes.haiku() at this install's note writer (for Haiku calls outside a run)."""
     load_secrets()

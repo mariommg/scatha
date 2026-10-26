@@ -60,6 +60,7 @@ Type `scatha`. It shows the last run, what's in Unsorted, what failed and will r
 | `scatha review` | The sorting desk: sort Unsorted bookmarks, check Jev's close calls. When you press Done, it offers to write full notes for anything you sorted out of Unsorted and to remove the ones you marked Don't keep |
 | `scatha run` | A run now (same options as below) |
 | `scatha setup` | The setup wizard (`scatha setup topics`, `scatha setup x-login`, ...) |
+| `scatha uninstall` | Lists what scatha put on your machine and removes only what you pick (section 8) |
 
 The wizard installs the command (`uv tool install --editable <repo>/router`); if you skipped that, `uv run --project <repo>/router scatha` does the same.
 
@@ -157,7 +158,8 @@ Batch size lives in `config.json` (or `setup schedule`). For a big backlog, a la
 
 - **Pause:** `setup unschedule`. Bring it back with `setup schedule`.
 - **Move the data folder:** set `SCATHA_HOME` to the new location (user environment variable), move the folder, then `setup schedule` to rewrite the scheduled script.
-- **Uninstall:** `setup unschedule`, delete `~/.scatha`, and remove the secrets (Windows: delete the four user environment variables). Your notes stay where they are; they're just Markdown.
+- **Uninstall:** `scatha uninstall` (or `setup uninstall`) lists everything scatha put on your machine: the schedule (and any a test install left behind), the data folder, each saved secret, the status note, Smaug's packages, and the `scatha` command. Each one says what it's for and what else removing it touches. For example, `AUTH_TOKEN` and `CT0` are read by bird and other X tools too. Nothing is removed unless you pick it, by number or name (`scatha uninstall --remove schedule data`; add `--yes` to skip the confirmation). Before deleting the data folder, it offers to keep a copy of your topics, settings, and desk answers. Your notes are listed but never offered: they're plain Markdown and work without scatha. It also refuses to delete a data folder that holds anything scatha didn't put there, so a `SCATHA_HOME` pointed at the wrong place can't take a vault with it.
+- **What uninstalling can't do:** log you out of X (the cookies keep working until you log out in your browser), revoke your TypeSafe or Anthropic key (do that on their sites), unsubscribe your phone from ntfy, or delete this folder, which holds the program and its Python environment. Delete it by hand once you're done.
 
 ## 9. For maintainers
 

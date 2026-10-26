@@ -771,13 +771,18 @@ def main(argv: list[str] | None = None) -> int:
     COLOR = enable_color()
     ap = argparse.ArgumentParser(prog=setup_cmd())
     ap.add_argument("command", nargs="?", default="all",
-                    choices=["all", "x-login", "topics", "schedule", "status", "unschedule", "review"])
+                    choices=["all", "x-login", "topics", "schedule", "status", "unschedule", "review", "uninstall"])
     ap.add_argument("--answers", help="answers file from docs/onboarding.html (no secrets)")
     ap.add_argument("--rebuild", action="store_true", help="review: re-score every bookmark with the current topics")
     ap.add_argument("--import", dest="import_file", metavar="FILE", help="review: carry over answers from an older review file")
     ap.add_argument("--no-browser", action="store_true", help="review: print the link instead of opening a browser")
     ap.add_argument("--skip-verify", action="store_true", help=argparse.SUPPRESS)  # tests only
-    args = ap.parse_args(argv)
+    args, rest = ap.parse_known_args(argv)
+    if args.command == "uninstall":
+        from . import uninstall
+        return uninstall.main(rest)
+    if rest:
+        ap.error("unrecognized arguments: " + " ".join(rest))
     answers = load_answers(args.answers)
     cfg = app.load_config()
     verify = not args.skip_verify

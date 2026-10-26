@@ -263,12 +263,28 @@ def run_now(args: list[str]) -> int:
     return subprocess.run(cmd, cwd=wrapper.parent, env=scheduler_env()).returncode
 
 
-def remove() -> str:
-    stem = app.task_name().lower()
+def others() -> list[str]:
+    """Schedules left by other installs on this machine (a test folder's 'Scatha-Ingest-<name>')."""
+    mine = app.task_name()
+    if sys.platform == "win32":
+        p = subprocess.run(["powershell.exe", "-NoProfile", "-Command",
+                            f"Get-ScheduledTask -TaskName '{app.TASK_NAME}*' | ForEach-Object TaskName"],
+                           capture_output=True, text=True)
+        names = p.stdout.split()
+    elif sys.platform == "darwin":
+        names = [f.stem.removeprefix("com.") for f in (Path.home() / "Library/LaunchAgents").glob(f"com.{app.TASK_NAME.lower()}*.plist")]
+    else:
+        names = [f.stem for f in (Path.home() / ".config/systemd/user").glob(f"{app.TASK_NAME.lower()}*.timer")]
+    return sorted(n for n in names if n.lower() != mine.lower())
+
+
+def remove(task: str | None = None) -> str:
+    task = task or app.task_name()
+    stem = task.lower()
     if sys.platform == "win32":
         subprocess.run(["powershell.exe", "-NoProfile", "-Command",
-                        f"Unregister-ScheduledTask -TaskName '{app.task_name()}' -Confirm:$false"], capture_output=True)
-        return f"Removed the Task Scheduler task '{app.task_name()}'."
+                        f"Unregister-ScheduledTask -TaskName '{task}' -Confirm:$false"], capture_output=True)
+        return f"Removed the Task Scheduler task '{task}'."
     if sys.platform == "darwin":
         plist = Path.home() / "Library/LaunchAgents" / f"com.{stem}.plist"
         subprocess.run(["launchctl", "bootout", f"gui/{os.getuid()}", str(plist)], capture_output=True)

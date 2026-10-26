@@ -6,6 +6,7 @@
                            (--pool: just list the bookmarks; --last: decide on the last run again)
     scatha run             import a batch now (same as the schedule; --preview, --batch N)
     scatha setup [step]    the setup wizard (x-login, topics, schedule, status, unschedule)
+    scatha uninstall       list what scatha put on this machine; remove only what you pick
 
 Install once with `uv tool install --editable <repo>/router` (setup offers to); it then
 works from any folder and follows this checkout.
@@ -27,10 +28,13 @@ def main(argv: list[str] | None = None) -> int:
     if cmd in ("-h", "--help", "help"):
         print(HELP)
         return 0
-    if cmd not in ("status", "review", "discover", "run", "setup"):
+    if cmd not in ("status", "review", "discover", "run", "setup", "uninstall"):
         print(f"Unknown command '{cmd}'.\n\n{HELP}")
         return 2
 
+    if cmd == "uninstall":  # works on a half-finished install too
+        from . import uninstall
+        return uninstall.main(argv)
     if not app.config_path().exists() and cmd != "setup":
         print(f"{app.APP_NAME} isn't set up yet. Type `{app.command('setup')}` to start.")
         return 1
