@@ -38,3 +38,8 @@ def find_vaults() -> list[Path]:
 
 def is_vault(path: Path) -> bool:
     return (path / ".obsidian").is_dir()
+
+
+def vault_of(path: Path, found: list[Path]) -> Path | None:
+    """The vault a folder (made yet or not) sits in: one Obsidian lists, or any folder with its settings."""
+    return next((p for p in [path, *path.parents] if p in found or is_vault(p)), None)

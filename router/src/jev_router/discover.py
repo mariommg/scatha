@@ -381,7 +381,8 @@ def decide_each(cfg: dict, result: dict, ui) -> int:
 
 def pick_destination(ui, tax: Taxonomy, found: list[Path], label: str) -> Path:
     """A folder for the new topic. Nothing assumed: a known vault (then a subfolder), a folder another
-    topic already uses (topics may share one), or any path."""
+    topic already uses (topics may share one), or any path (asked about if it's outside every vault)."""
+    from . import vaults
     used = list(dict.fromkeys(Path(t.destination) for t in tax.topics if t.destination))
     options = ([f"A new folder in {v.name}  {ui.dim(str(v))}" for v in found]
                + [f"Share {p.name}/ with another topic  {ui.dim(str(p))}" for p in used]
@@ -395,6 +396,9 @@ def pick_destination(ui, tax: Taxonomy, found: list[Path], label: str) -> Path:
         else:
             dest = Path(ui.ask("Folder path")).expanduser()
         problem = check_destination(dest)
-        if not problem:
+        if problem:
+            ui.bad(problem)
+        elif vaults.vault_of(dest, found) or ui.yes(
+                f"{dest} isn't inside an Obsidian vault, so Obsidian won't show these notes. Use it anyway?",
+                default=False):
             return dest
-        ui.bad(problem)

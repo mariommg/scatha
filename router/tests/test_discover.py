@@ -230,14 +230,41 @@ def test_destination_checks(tmp_path):
 
 class FakeUI:
     def __init__(self, picks, answers=(), yes=True):
-        self.picks, self.answers, self._yes, self.said = list(picks), list(answers), yes, []
+        self.picks, self.answers, self._yes, self.said, self.asked = list(picks), list(answers), yes, [], []
     def choose(self, prompt, options, default=1): return self.picks.pop(0)
     def ask(self, prompt, default=None, clearable=False): return self.answers.pop(0) if self.answers else default
-    def yes(self, prompt, default=True): return self._yes
+    def yes(self, prompt, default=True):
+        self.asked.append(prompt)
+        return self._yes.pop(0) if isinstance(self._yes, list) else self._yes
     def pick_subfolder(self, base, label, current=None): return base / label
     def dim(self, t): return t
     def say(self, t=""): self.said.append(t)
     ok = bad = hint = say
+
+
+def vault_at(path):
+    (path / ".obsidian").mkdir(parents=True)
+    return path
+
+
+def test_a_typed_folder_outside_every_vault_asks_first(tmp_path):
+    # 2026-10-26: R notes went to a folder beside the vaults, where Obsidian couldn't show them
+    v = vault_at(tmp_path / "Book")
+    outside, inside = tmp_path / "R_Programming", v / "R Programming"
+    ui = FakeUI(picks=[4, 4], answers=[str(outside), str(inside)], yes=[False])
+    assert discover.pick_destination(ui, tax_at(tmp_path), [v], "R") == inside
+    assert len(ui.asked) == 1 and "vault" in ui.asked[0]  # asked about the outside one only
+    ui = FakeUI(picks=[4], answers=[str(outside)], yes=[True])
+    assert discover.pick_destination(ui, tax_at(tmp_path), [v], "R") == outside  # a warning, not a block
+
+
+def test_a_folder_in_a_vault_obsidian_lists_or_on_disk_needs_no_question(tmp_path):
+    listed = tmp_path / "Listed"  # in obsidian.json, settings folder not made yet
+    unlisted = vault_at(tmp_path / "Unlisted")
+    for dest in (listed / "R", unlisted / "deep" / "R"):
+        ui = FakeUI(picks=[4], answers=[str(dest)], yes=[])
+        assert discover.pick_destination(ui, tax_at(tmp_path), [listed], "R") == dest
+        assert ui.asked == []
 
 
 def decided_result(home):
