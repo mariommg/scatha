@@ -112,7 +112,7 @@ def test_a_candidate_that_rescues_too_few_is_set_aside():
     assert not c["kept"]
     result = {"pool": [str(i) for i in range(1, 7)], "candidates": [c], "missed": []}
     out = discover.text(result, {it["id"]: it for it in items})
-    assert "None held up" in out and "Set aside (too few rescued): X (4)" in out
+    assert "None of the ideas held up" in out and "Set aside (each rescued fewer than 5): X (4)" in out
 
 
 # ---------- the whole run ----------
@@ -150,7 +150,7 @@ def test_run_reports_saves_and_leaves_topics_alone(home, monkeypatch):
     result = discover.run(app.load_config(), say=out.append)
     assert result["candidates"][0]["rescued"] == ids and result["missed"] == []
     text = "\n".join(out)
-    assert "Data viz: learn charts" in text and "Would rescue 7 of the 7" in text
+    assert "Data viz: learn charts" in text and "It would rescue 7 of the 7" in text
     assert (home / "topics.yaml").read_text(encoding="utf-8") == before
     saved = list(discover.runs_dir().glob("*.json"))
     assert len(saved) == 1 and json.loads(saved[0].read_text(encoding="utf-8"))["jev_tokens"] == 123
@@ -167,7 +167,7 @@ def test_pool_only_is_free(home, monkeypatch):
     calls = fake_world(monkeypatch, [item(i, 0.1, 0.1) for i in range(1, 8)], {"topics": []}, {})
     out = []
     assert discover.run(app.load_config(), say=out.append, pool_only=True) is None
-    assert not calls and "Pool: 7 bookmarks" in out[0]
+    assert not calls and "7 bookmarks fit no topic well" in out[0]
 
 
 def test_answers_on_the_desk_leave_the_pool(home, monkeypatch):
@@ -178,7 +178,7 @@ def test_answers_on_the_desk_leave_the_pool(home, monkeypatch):
         store.put(i, {"verdict": "drop", "source": "vault"})
     out = []
     discover.run(app.load_config(), say=out.append, pool_only=True)
-    assert "Pool: 4 bookmarks" in out[0] and "not counting 3 you said aren't worth keeping" in out[0]
+    assert "4 bookmarks fit no topic well" in out[0] and "include the 3 you said aren't worth keeping" in out[0]
 
 
 # ---------- adding a topic ----------
@@ -309,7 +309,7 @@ def test_last_rereads_the_saved_run_unless_topics_changed(home):
     deck_on_disk([item(1, 0.1, 0.1)])
     tax = Taxonomy.load(home / "topics.yaml")
     out = []
-    assert discover.last(app.load_config(), out.append) is None and "No discovery run" in out[0]
+    assert discover.last(app.load_config(), out.append) is None and "no saved discovery run" in out[0]
     discover.runs_dir().mkdir(parents=True)
     saved = {"pool": ["1"], "candidates": [], "missed": ["1"], "topics_hash": desk.topics_hash(review.topic_list(tax))}
     (discover.runs_dir() / "2026-10-15_1411.json").write_text(json.dumps(saved), encoding="utf-8")

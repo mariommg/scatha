@@ -135,7 +135,7 @@ Type `scatha discover`. It costs a few cents (one Haiku call, plus Jev scoring e
 
 Ideas that would rescue fewer than 5 bookmarks are set aside.
 
-For each idea that holds up, pick **Add it as a topic**, **Not for me** (never suggested again), or **Not now**. If you add it:
+For each idea that holds up, pick **Add**, **Not for Me** (never suggested again), or **Not Now**. If you add it:
 
 1. You name it and pick its folder: a new folder in one of your vaults, a folder another topic already uses, or any folder you type in. (A folder outside every Obsidian vault gets a warning, since Obsidian won't show those notes.)
 2. Scatha adds it to `topics.yaml` (keeping a copy of the old file in `tuning/`) and updates every note's topic list.

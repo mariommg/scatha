@@ -14,7 +14,7 @@ them:
                 and which of your desk answers it disagrees with
 
 A candidate that rescues fewer than MIN_RESCUED is set aside: too small to be worth a
-topic. Topics you said "Not for me" to (tuning/not-for-me.json) are shown to Haiku so it
+topic. Topics you said "Not for Me" to (tuning/not-for-me.json) are shown to Haiku so it
 doesn't propose them again. Nothing changes your topics until you pick Add; then the new
 topic goes into topics.yaml (old copy kept), the desk and every filed note's topic list
 learn it from the scores already in hand, and notes are never moved.
@@ -33,6 +33,7 @@ import os
 from pathlib import Path
 
 from . import Router, Taxonomy, Topic, app, desk, review, topics, unsorted
+from .report import _n
 from .smaug import bookmark_state
 
 WEAK = 0.45  # a bookmark whose best topic scores under this barely fits anywhere
@@ -203,25 +204,28 @@ def run(cfg: dict, say=print, pool_only: bool = False) -> dict | None:
     items = pool(deck, answers, led)
     pool_ids = {it["id"] for it in items}
     in_unsorted = sum(1 for i in pool_ids if led.get(i, {}).get("status") == "skip")
-    say(f"  Pool: {len(items)} bookmarks that fit no topic well ({in_unsorted} in Unsorted, "
-        f"{len(items) - in_unsorted} filed on a weak fit), not counting {len(unsorted.judged_drops())} "
-        "you said aren't worth keeping.")
+    dropped = len(unsorted.judged_drops())
+    say(f"  {_n(len(items), 'bookmark')} fit no topic well ({in_unsorted} in Unsorted, "
+        f"{len(items) - in_unsorted} in a topic they barely fit)."
+        + (f" This doesn't include the {dropped} you said aren't worth keeping." if dropped else ""))
     if pool_only:
         for it in items:
             say(f"    {it['id']}  @{it.get('author')}  {gist(it, 100)[:110]}")
         return None
     if len(items) < MIN_MEMBERS:
-        say(f"  Too few to find a pattern in (a topic needs at least {MIN_MEMBERS}). Nothing to propose.")
+        say(f"  Too few to find a pattern. A new topic needs at least {MIN_MEMBERS} bookmarks, "
+            f"so {app.DISPLAY_NAME} has nothing to suggest.")
         return None
 
     refused = not_for_me()
-    say(f"  Asking Haiku what these have in common (one call)...")
+    say(f"  Asking Haiku what these bookmarks have in common (one call)...")
     cands, usage = propose(items, tax, refused, pool_ids)
     if not cands:
-        say("  Haiku found no group big enough to be a topic. Your topics cover what you save.")
+        say("  Haiku found no group big enough for a new topic. Your topics already cover what you save.")
         return None
-    say(f"  {len(cands)} ideas: {', '.join(c['label'] for c in cands)}. "
-        f"Checking each against all {len(deck['items'])} bookmarks with Jev (a few cents)...")
+    say(f"  Haiku has {_n(len(cands), 'idea')}: {', '.join(c['label'] for c in cands)}. "
+        f"Jev is checking {'it' if len(cands) == 1 else 'each one'} against all {len(deck['items'])} "
+        "bookmarks (a few cents)...")
     bookmarks = {i: b for i, b in review.collect_bookmarks(app.work()).items() if i in {it['id'] for it in deck['items']}}
     scores, tokens = score(cands, bookmarks, tax.model, tax.route_at)
     found = assess(cands, scores, deck, answers, led, pool_ids, tax.route_at)
@@ -235,46 +239,49 @@ def run(cfg: dict, say=print, pool_only: bool = False) -> dict | None:
     desk._write_json(path, result)
     say("")
     say(text(result, {it["id"]: it for it in deck["items"]}))
-    say(f"\n  Saved: {path}")
+    say(f"\n  Saved to {path}. (To see it again for free, type `{app.command('discover --last')}`.)")
     return result
 
 
 def text(result: dict, items: dict[str, dict]) -> str:
     def who(i: str) -> str:
         it = items.get(i, {})
-        return f"@{it.get('author')}: {gist(it, 70)[:80]}"
+        post = " ".join((it.get("text") or "").split())  # the post alone: a cut-off "| Links:" tail reads as noise
+        return f"@{it.get('author')}: {(post or gist(it))[:80]}"
 
     kept = [c for c in result["candidates"] if c["kept"]]
-    lines = [f"Topic ideas from {len(result['pool'])} bookmarks that fit nothing well:"]
+    lines = [f"Topic ideas from the {_n(len(result['pool']), 'bookmark')} that fit no topic well:"]
     if not kept:
-        lines.append(f"  None held up: Jev agreed on fewer than {MIN_RESCUED} bookmarks for each idea.")
+        lines.append(f"  None of the ideas held up. For each one, Jev agreed on fewer than {MIN_RESCUED} bookmarks.")
     for c in kept:
         lines += ["", f"  {c['label']}: {c['use']}",
-                  f"    Would rescue {len(c['rescued'])} of the {len(result['pool'])} "
-                  f"(Haiku named {len(c['examples'])}; Jev agreed on {c['agreed']} of those)."]
+                  f"    It would rescue {len(c['rescued'])} of the {len(result['pool'])}. "
+                  f"(Haiku named {len(c['examples'])} examples, and Jev agreed on {c['agreed']}.)"]
         lines += [f"      {who(i)}" for i in c["rescued"][:5]]
         if len(c["rescued"]) > 5:
             lines.append(f"      ...and {len(c['rescued']) - 5} more")
         if c["overlap"]:
-            lines.append("    Also fits bookmarks already filed: " +
-                         ", ".join(f"{n} in {t}" for t, n in c["overlap"].items()) +
-                         (f"; it would win {len(c['moves'])} of them (notes are never moved)." if c["moves"] else "."))
+            won = len(c["moves"])
+            lines.append("    It also fits bookmarks you already filed: " +
+                         ", ".join(f"{n} in {t}" for t, n in c["overlap"].items()) + "." +
+                         (f" It fits {won} of them better than {'its' if won == 1 else 'their'} current topic. "
+                          "(Notes never move.)" if won else ""))
         if c["conflicts"]:
-            lines.append(f"    Disagrees with {len(c['conflicts'])} of your desk answers:")
-            lines += [f"      you said {x['said']}: {who(x['id'])}" for x in c["conflicts"][:5]]
+            lines.append(f"    It disagrees with {_n(len(c['conflicts']), 'answer')} you gave on the desk:")
+            lines += [f"      You said {x['said']}: {who(x['id'])}" for x in c["conflicts"][:5]]
         lines.append(f"    Jev's question: {c['question']}")
     set_aside = [c for c in result["candidates"] if not c["kept"]]
     if set_aside:
-        lines += ["", "  Set aside (too few rescued): " +
+        lines += ["", f"  Set aside (each rescued fewer than {MIN_RESCUED}): " +
                   ", ".join(f"{c['label']} ({len(c['rescued'])})" for c in set_aside)]
     lines += ["", f"  Still without a topic: {len(result['missed'])} of {len(result['pool'])}."]
     return "\n".join(lines)
 
 
-# ---------- the user's call: Add / Not for me / Not now ----------
+# ---------- the user's call: Add / Not for Me / Not Now ----------
 
 def forget(c: dict) -> None:
-    """Not for me: remembered, and shown to Haiku so it isn't proposed again."""
+    """Not for Me: remembered, and shown to Haiku so it isn't proposed again."""
     refused = not_for_me() + [{"label": c["label"], "use": c.get("use", ""),
                                "at": dt.date.today().isoformat()}]
     desk._write_json(not_for_me_path(), refused)
@@ -283,14 +290,14 @@ def forget(c: dict) -> None:
 def check_destination(path: Path) -> str | None:
     """Why a folder can't take notes, or None. Nothing is created here: notes make it when they land."""
     if not path.is_absolute():
-        return "Give a full path (starting from a drive or /)."
+        return "Type the full path. It starts with a drive letter (like C:\\) or with /."
     if ".obsidian" in path.parts:
-        return "That's inside Obsidian's settings folder."
+        return "That's inside Obsidian's settings folder (.obsidian). Pick a different folder."
     if path.exists() and not path.is_dir():
-        return "That's a file, not a folder."
+        return "That's a file, not a folder. Pick a folder."
     parent = next((p for p in [path, *path.parents] if p.exists()), None)
     if parent is None or not os.access(parent, os.W_OK):
-        return "Can't write there."
+        return f"{app.DISPLAY_NAME} can't save files there. Pick a different folder."
     return None
 
 
@@ -314,7 +321,7 @@ def add_topic(cfg: dict, c: dict, scores: dict[str, dict], label: str, destinati
     header = "".join(l + "\n" for l in tax_path.read_text(encoding="utf-8").splitlines() if l.startswith("#"))
     tax_path.write_text(header + yaml.safe_dump(raw, sort_keys=False, allow_unicode=True, width=100), encoding="utf-8")
     tax = Taxonomy.load(tax_path)
-    say(f"  Added '{label}' to {tax_path} (the old file is kept as {backup.name}).")
+    say(f"  Added '{label}' to {tax_path}. (The old file is saved as {backup.name}.)")
 
     deck = json.loads(review.deck_path().read_text(encoding="utf-8"))
     for it in deck["items"]:
@@ -335,12 +342,13 @@ def last(cfg: dict, say=print) -> dict | None:
     """The newest saved discovery run, if the topics haven't changed since (else its numbers are stale)."""
     runs = sorted(runs_dir().glob("*.json")) if runs_dir().is_dir() else []
     if not runs:
-        say(f"  No discovery run saved yet. `{app.command('discover')}` makes one.")
+        say(f"  There's no saved discovery run yet. To make one, type `{app.command('discover')}`.")
         return None
     result = json.loads(runs[-1].read_text(encoding="utf-8"))
     tax = Taxonomy.load(app.taxonomy_path(cfg))
     if result.get("topics_hash") != desk.topics_hash(review.topic_list(tax)):
-        say(f"  Your topics changed since the last discovery run; `{app.command('discover')}` makes a fresh one.")
+        say("  Your topics changed after the last discovery run, so its numbers are out of date. "
+            f"To make a new one, type `{app.command('discover')}`.")
         return None
     deck = json.loads(review.deck_path().read_text(encoding="utf-8"))
     say(text(result, {it["id"]: it for it in deck["items"]}))
@@ -353,26 +361,28 @@ def decide_each(cfg: dict, result: dict, ui) -> int:
     led = review.ledger(app.work())
     added = 0
     for c in [c for c in result["candidates"] if c["kept"]]:
-        pick = ui.choose(f"'{c['label']}': what do you want to do?",
-                         ["Add it as a topic", "Not for me (don't suggest it again)", "Not now"], default=3)
+        pick = ui.choose(f"What do you want to do with '{c['label']}'?",
+                         ["Add  (make it a topic)", f"Not for Me  ({app.DISPLAY_NAME} won't suggest it again)",
+                          "Not Now  (it may come up again later)"], default=3)
         if pick == 2:
             forget(c)
-            ui.ok(f"Noted. '{c['label']}' won't be suggested again.")
+            ui.ok(f"Noted. {app.DISPLAY_NAME} won't suggest '{c['label']}' again.")
             continue
         if pick == 3:
             continue
-        label = ui.ask("Name it", default=c["label"])
+        label = ui.ask("Name for this topic", default=c["label"])
         tax = Taxonomy.load(app.taxonomy_path(cfg))
         dest = pick_destination(ui, tax, vaults.find_vaults(), label)
         key = add_topic(cfg, c, result["scores"], label, dest, ui.say)
         added += 1
         unsorted_ids = [i for i in c["rescued"] if led.get(i, {}).get("status") == "skip"]
-        if unsorted_ids and ui.yes(f"Write full notes for the {len(unsorted_ids)} bookmarks it rescues from Unsorted "
-                                   f"into {dest}? (Haiku, about 2,000 Claude tokens each)"):
+        if unsorted_ids and ui.yes(f"Write full notes into {dest} for the {_n(len(unsorted_ids), 'bookmark')} "
+                                   "it rescues from Unsorted? (Haiku writes them, about 2,000 Claude tokens each.)"):
             review.write_up(cfg, {i: key for i in unsorted_ids}, ui.say)
-        if c["moves"]:
-            ui.hint(f"{len(c['moves'])} filed notes now fit '{label}' better than where they are. "
-                    "They stay put; their topic lists now include it.")
+        if moved := len(c["moves"]):
+            their = "its" if moved == 1 else "their"
+            ui.hint(f"'{label}' fits {_n(moved, 'filed note')} better than {their} current topic. "
+                    f"Notes stay put, but {their} topic list now includes '{label}'.")
     if added:
         from . import report
         report.write_note(cfg)
@@ -383,10 +393,14 @@ def pick_destination(ui, tax: Taxonomy, found: list[Path], label: str) -> Path:
     """A folder for the new topic. Nothing assumed: a known vault (then a subfolder), a folder another
     topic already uses (topics may share one), or any path (asked about if it's outside every vault)."""
     from . import vaults
-    used = list(dict.fromkeys(Path(t.destination) for t in tax.topics if t.destination))
-    options = ([f"A new folder in {v.name}  {ui.dim(str(v))}" for v in found]
-               + [f"Share {p.name}/ with another topic  {ui.dim(str(p))}" for p in used]
-               + ["Another folder (type a path)"])
+    owners: dict[Path, list[str]] = {}
+    for t in tax.topics:
+        if t.destination:
+            owners.setdefault(Path(t.destination), []).append(t.label or t.key)
+    used = list(owners)
+    options = ([f"New Folder in {v.name}  {ui.dim(str(v))}" for v in found]
+               + [f"Share {p.name} with {', '.join(owners[p])}  {ui.dim(str(p))}" for p in used]
+               + ["Another Folder  (type its full path)"])
     while True:
         pick = ui.choose(f"Where should '{label}' notes go?", options, default=1)
         if pick <= len(found):
@@ -394,7 +408,7 @@ def pick_destination(ui, tax: Taxonomy, found: list[Path], label: str) -> Path:
         elif pick <= len(found) + len(used):
             dest = used[pick - len(found) - 1]
         else:
-            dest = Path(ui.ask("Folder path")).expanduser()
+            dest = Path(ui.ask("Full folder path")).expanduser()
         problem = check_destination(dest)
         if problem:
             ui.bad(problem)
