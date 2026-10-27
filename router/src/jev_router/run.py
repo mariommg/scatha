@@ -229,7 +229,23 @@ def main(argv: list[str] | None = None) -> int:
 
         # 3. Images -> text, 4. route, 5. notes
         run_dir = new_run_dir(w, stamp)
-        notes.cmd_describe(argparse.Namespace(pending=str(pending)))
+        unseen = notes.cmd_describe(argparse.Namespace(pending=str(pending))) or []
+        if unseen:
+            # A post that's mostly images, filed without them, would be filed on almost nothing and never
+            # read again. Held back instead: out of this run and out of the ledger, so the next fetch retries it.
+            held = {i for i, _ in unseen}
+            data = json.loads(pending.read_text(encoding="utf-8"))
+            data["bookmarks"] = [b for b in data["bookmarks"] if str(b["id"]) not in held]
+            data["imagesFailed"] = [{"id": i, "error": e} for i, e in unseen]
+            pending.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+            log(f"{len(held)} held back for the next run: reading their images failed")
+        # Again from the file: it now holds the text read from the images (light notes show it too)
+        bookmarks = {str(b["id"]): b for b in json.loads(pending.read_text(encoding="utf-8"))["bookmarks"]}
+        if not bookmarks:  # every one was held back
+            shutil.move(str(pending), run_dir / "pending-bookmarks.json")
+            ping(cfg, f"Bookmark import: reading the images of {len(unseen)} bookmarks failed. "
+                      "They will retry next run. The newest log in the data folder has details.")
+            return 1
         results = asyncio.run(route_file(pending, tax_path, run_dir))
         summary = notes.cmd_write(argparse.Namespace(
             pending=str(pending), routes=str(run_dir / "routes.json"), taxonomy=str(tax_path),
@@ -258,7 +274,7 @@ def main(argv: list[str] | None = None) -> int:
 
         # 7. Summary
         labels = {t.key: t.label or t.key.replace("_", " ") for t in tax.topics}
-        failed = len(summary["failed"]) + sum(r.status == "error" for r in results) + len(unread)
+        failed = len(summary["failed"]) + sum(r.status == "error" for r in results) + len(unread) + len(unseen)
         if not args.preview:
             report.record_run(dict(collections.Counter(b for _, b, _ in summary["written"])), len(skips),
                               failed, remaining, unsorted.mode(cfg))

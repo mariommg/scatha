@@ -287,7 +287,8 @@ def describe_images(b: dict) -> tuple[str, dict]:
     return haiku(content)
 
 
-def cmd_describe(args) -> None:
+def cmd_describe(args) -> list[tuple[str, str]]:
+    """Reads the images of mostly-image posts into imageText. Returns (id, error) for each that failed."""
     path = Path(args.pending)
     data = json.loads(path.read_text(encoding="utf-8"))
     todo = [b for b in data["bookmarks"]
@@ -297,17 +298,20 @@ def cmd_describe(args) -> None:
     def safe(b):
         try:
             return describe_images(b)
-        except Exception as e:  # leave imageText unset; the post is routed on its text and retried next run
+        except Exception as e:  # imageText stays unset; the caller holds the bookmark back for the next run
             return None, {"error": f"{type(e).__name__}: {e}"}
 
+    failed = []
     with ThreadPoolExecutor(max_workers=4) as pool:
         for b, (text, usage) in zip(todo, pool.map(safe, todo)):
             if text is None:
                 print(f"  FAILED reading images for @{b['author']}: {usage['error'][:200]}")
+                failed.append((str(b["id"]), usage["error"]))
                 continue
             b["imageText"] = text
             print(f"  @{b['author']}: {len(_words(text))} words from {len(_photos(b))} images ({usage.get('input_tokens')} in)")
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    return failed
 
 
 # ---------- write: routed bookmark -> Obsidian note ----------

@@ -79,3 +79,39 @@ def test_two_runs_in_one_minute_keep_both_saved_batches(world, monkeypatch):
     assert set(review.ledger(app.work())) == {"1", "2"}
     assert set(review.collect_bookmarks(app.work())) == {"1", "2"}
     assert sorted(d.name for d in (app.work() / "runs").iterdir()) == ["2026-10-27_1234", "2026-10-27_1234-2"]
+
+
+PHOTO = [{"type": "photo", "url": "https://example.invalid/image.png"}]
+
+
+def test_a_failed_image_read_holds_the_bookmark_for_the_next_run(world, monkeypatch):
+    data, vault, cfg = world
+    led = app.work() / "ingested.md"
+    outage = [True]
+
+    def images(b):
+        if outage[0]:
+            raise RuntimeError("temporary image service outage")
+        return "The text in the screenshot", {}
+    monkeypatch.setattr(notes, "describe_images", images)
+    routed_as(monkeypatch, "skip", "ai", {"ai": .1})
+    (app.work() / "pending-bookmarks.json").write_text(json.dumps({"bookmarks": [bm(1, media=PHOTO), bm(2)]}))
+    assert run.main([]) == 1  # something failed, and says so
+    assert "status/1 " not in led.read_text() and "status/2 " in led.read_text()
+    assert report.history()[-1]["failed"] == 1 and len(list((vault / "Unsorted").glob("*.md"))) == 1
+
+    outage[0] = False  # next week: the fetch brings it back (it isn't in the ledger), and the images read
+    (app.work() / "pending-bookmarks.json").write_text(json.dumps({"bookmarks": [bm(1, media=PHOTO)]}))
+    assert run.main([]) == 0
+    assert "status/1 " in led.read_text() and len(list((vault / "Unsorted").glob("*.md"))) == 2
+    assert any("The text in the screenshot" in p.read_text(encoding="utf-8") for p in (vault / "Unsorted").glob("*.md"))
+
+
+def test_when_every_image_read_fails_nothing_is_ledgered(world, monkeypatch):
+    monkeypatch.setattr(notes, "describe_images", lambda b: (_ for _ in ()).throw(RuntimeError("outage")))
+    routed_as(monkeypatch, "skip", "ai", {"ai": .1})
+    (app.work() / "pending-bookmarks.json").write_text(json.dumps({"bookmarks": [bm(1, media=PHOTO)]}))
+    assert run.main([]) == 1
+    led = app.work() / "ingested.md"
+    assert not led.exists() or "status/1" not in led.read_text()
+    assert not (app.work() / "pending-bookmarks.json").exists()  # saved with the run, not resumed as if new
