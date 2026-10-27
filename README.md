@@ -4,7 +4,7 @@
 
 I had 443 bookmarks on X going back to 2018. I had read approximately none of them twice.
 
-That's the bookmark problem: saving feels like learning, and it isn't. The post you saved because it explained something perfectly is gone the moment you scroll past it, buried under four hundred others with no titles, no folders, and no search worth the name.
+That's the bookmark problem: saving feels like learning, and it isn't. The post you saved because it explained something perfectly is gone the moment you scroll past it, buried under four hundred others with no titles, no folders, and a search box that never seems to find it.
 
 **Enter Scatha.** What Scatha does is pull your bookmarks out on a schedule and decide which of your topics each one belongs to. Then it reads the whole thing (threads, linked articles, the text in screenshots) and writes it up as a note where you already keep your notes (I use it with [Obsidian](https://obsidian.md/)). Each note gets:
 
@@ -51,7 +51,7 @@ New to GitHub? No problem. You don't need an account, and you won't touch any co
 2. Unzip it somewhere it can stay, like your Documents folder.
 
 > [!IMPORTANT]
-> **Pick a permanent home for the folder.** It *is* the program: the schedule runs Scatha from there. If you move or delete the folder later, the schedule stops working. (To fix it, run `setup schedule` from the new spot.)
+> **Pick a permanent home for the Scatha folder.** That folder *is* the program, and the schedule runs Scatha from there. If you move or delete it later, the schedule stops working. (To fix it, run `setup schedule` from the new spot.) This goes for the Scatha folder only: the setup file you'll make in step 4 can stay in Downloads.
 
 Comfortable with git? `git clone https://github.com/mariommg/scatha.git` does the same thing, and `git pull` gets you updates later.
 
@@ -67,7 +67,9 @@ Install everything under [What you need](#what-you-need). After installing uv, c
 
 ### 4. Plan, then run setup
 
-From the Scatha folder, open `docs/onboarding.html` in your browser (double-click it) and plan your topics, folders, and schedule. It saves a small answers file called `my-setup.json` (no secrets in it, on purpose). Your browser puts it in your Downloads folder, unless you've told it otherwise. Then:
+From the Scatha folder, open `docs/onboarding.html` in your browser (double-click it) and plan your topics, folders, and schedule. When you're done, it downloads a small file called `my-setup.json` with your answers (no secrets in it, on purpose).
+
+Leave that file in your Downloads folder. Setup reads it once, and you can delete it afterward. Then run setup, pointed at it:
 
 ```powershell
 # Windows
@@ -79,7 +81,7 @@ powershell -ExecutionPolicy Bypass -File setup.ps1 --answers $HOME\Downloads\my-
 ./setup.sh --answers ~/Downloads/my-setup.json
 ```
 
-... and follow the prompts. If your browser saved the file somewhere else, change the path to match.
+... and follow the prompts. (Does your browser save downloads somewhere else? Change the path to match.)
 
 Or skip the planner and run `setup.ps1` / `./setup.sh` with no arguments. The wizard asks everything itself.
 
