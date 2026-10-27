@@ -93,30 +93,31 @@ td:first-child { width: 42%; }
 <body>
 <div class="wrap">
   <header style="display:grid;gap:10px">
-    <span class="eyebrow">scatha · setup planner</span>
+    <span class="eyebrow">Scatha · setup planner</span>
     <h1>Bookmark Setup Planner</h1>
-    <p class="prose">You save things on X because they matter to you, and then (if you're like me) you never see them again. This sets up a small machine that pulls your bookmarks on a schedule, sorts each one into topics you choose, and writes it up as a note in your Obsidian vault or any folder you like.</p>
-    <p class="prose">Plan the setup here, download one file, and the setup wizard takes it from there.</p>
-    <p class="promise">This page never asks for a password, cookie, or API key. The wizard asks for those in hidden prompts on your own computer, checks each one, and stores it there.</p>
+    <p class="prose">You save things on X because they matter to you, and then (if you're like me) you never see them again. Scatha pulls your bookmarks on a schedule, sorts each one into topics you choose, and writes it up as a note in your Obsidian vault or any folder you like.</p>
+    <p class="prose">Plan your setup on this page and download one file. The setup wizard reads that file and asks you only what's left.</p>
+    <p class="promise">This page never asks for a password, cookie, or API key. The setup wizard asks for those in hidden prompts on your own computer, checks each one, and stores it there.</p>
   </header>
 
   <section class="sheet" aria-labelledby="h1s">
     <h2 id="h1s"><span class="n">01</span>Before you start</h2>
     <p class="muted">Tick these off as you go. (They're remembered in this browser only.)</p>
     <div class="checks" id="checks"></div>
+    <p class="warnbox"><b>Scatha uses your X session cookies for automated reading, which X's terms don't love.</b> It only reads your own bookmarks, one batch per scheduled run, at a modest pace. But it's your account and your call.</p>
   </section>
 
   <section class="sheet" aria-labelledby="h2s">
     <h2 id="h2s"><span class="n">02</span>Topics and where they go</h2>
-    <p class="prose">Every bookmark goes to the topic it fits best. One that fits none of them gets skipped, which is a feature: it's how the junk stays out of your vault.</p>
-    <p class="muted">Start from a preset or two. The ones with a ✓ were tuned against real review answers; the rest get sharpened by the wizard.</p>
+    <p class="prose">Every bookmark goes to the topic it fits best. One that fits none of them goes to an <b>Unsorted</b> folder as a light note: the post and its links, no summary, no cost. Later, you can sort it on the sorting desk, delete it, or let Scatha look for the topic you haven't named yet. (The setup wizard asks where Unsorted should go.)</p>
+    <p class="muted">Start from a preset or two. The ones with a ✓ were tuned against real review answers; the setup wizard sharpens the rest.</p>
     <div class="chips" id="presets"></div>
     <div class="field" style="max-width:560px">
       <label for="vault">Default folder: your Obsidian vault, or any folder (topics go in subfolders under it)</label>
       <input type="text" id="vault" placeholder="C:\Users\you\Documents\My Vault   or   ~/Notes">
     </div>
     <div class="topics" id="topics"></div>
-    <div><button class="btn" type="button" id="addTopic">+ Add your own topic</button></div>
+    <div><button class="btn" type="button" id="addTopic">+ Add Your Own Topic</button></div>
     <div>
       <p class="eyebrow" style="margin-bottom:6px">Where notes will land</p>
       <div class="tree" id="tree"></div>
@@ -127,8 +128,8 @@ td:first-child { width: 42%; }
     <h2 id="h3s"><span class="n">03</span>Who writes the notes</h2>
     <p class="prose">Claude Haiku reads each bookmark (threads, linked articles, even text in images) and writes the note: a summary, the key points, a quote or two, and a how-to when a post shares a recipe or tool.</p>
     <div class="radios" role="radiogroup" aria-label="Note writer">
-      <label><input type="radio" name="backend" value="claude-code" checked><span><b>Claude Code, headless</b><span class="muted">Uses your Claude subscription; nothing extra to buy. For one Pro user, 100 notes used about a quarter of a 5-hour window.</span></span></label>
-      <label><input type="radio" name="backend" value="anthropic-api"><span><b>Anthropic API key</b><span class="muted">Pay as you go, roughly a cent per note. Good if you don't use Claude Code or want to keep its usage for coding.</span></span></label>
+      <label><input type="radio" name="backend" value="claude-code" checked><span><b>Claude Code, headless</b><span class="muted">Scatha starts Claude Code in the background, so you don't need it open. Uses your Claude plan; nothing extra to buy. For one Pro user, 100 notes used about a quarter of a 5-hour window.</span></span></label>
+      <label><input type="radio" name="backend" value="anthropic-api"><span><b>Anthropic API Key</b><span class="muted">Pay as you go, roughly a cent per note. Good if you don't use Claude Code, or want to save its usage for coding.</span></span></label>
     </div>
     <div class="field"><label for="reader">One sentence about you (optional): how-to steps get tailored to it</label>
       <input type="text" id="reader" placeholder="I work in Claude Code on Windows 11 and keep notes in Obsidian."></div>
@@ -138,7 +139,7 @@ td:first-child { width: 42%; }
     <h2 id="h4s"><span class="n">04</span>When it runs</h2>
     <div class="fields">
       <div class="field"><label for="cadence">How often</label>
-        <select id="cadence"><option value="weekly" selected>Weekly</option><option value="biweekly">Every other week</option><option value="daily">Daily</option></select></div>
+        <select id="cadence"><option value="weekly" selected>Weekly</option><option value="biweekly">Every Other Week</option><option value="daily">Daily</option></select></div>
       <div class="field" id="dayField"><label for="day">Day</label>
         <select id="day"></select></div>
       <div class="field"><label for="time">Time (24-hour)</label><input type="time" id="time" value="00:01"></div>
@@ -146,15 +147,16 @@ td:first-child { width: 42%; }
       <div class="field"><label for="ntfy">Phone ping via ntfy (optional topic)</label><input type="text" id="ntfy" placeholder="something-hard-to-guess"></div>
     </div>
     <p class="sentence" id="sentence"></p>
-    <p class="muted">Got a big backlog? Each run takes up to that many unprocessed bookmarks, newest first, so the backlog clears a batch per run. The computer needs to be on with you logged in (a locked screen is fine); if it's asleep, it wakes, and if it's off, the run happens at your next login.</p>
+    <p class="muted">Got a big backlog? Each run takes up to that many bookmarks Scatha hasn't read yet, newest first, so the backlog goes down one batch per run. (Scatha reads your newest 1,000 bookmarks; older ones won't come through yet.) The computer needs to be on with you logged in, but a locked screen is fine. If it's asleep, it wakes up for the run. If it's off, the run happens at your next login.</p>
   </section>
 
   <section class="sheet" aria-labelledby="h5s">
-    <h2 id="h5s"><span class="n">05</span>Run the wizard</h2>
-    <p class="prose">Save your plan, then run setup with it. The wizard checks your tools, asks for your X cookies and keys (hidden), confirms each one works, installs the schedule, and offers a five-bookmark test drive into a preview folder.</p>
+    <h2 id="h5s"><span class="n">05</span>Run the setup wizard</h2>
+    <p class="prose">Download your plan, then run the setup wizard with it. It checks your tools and asks for your X cookies and keys (what you paste stays hidden), and it checks that each one works. Then it asks where Unsorted goes, sets up the schedule, and offers a test run on your five newest bookmarks. Those notes go to a preview folder, so you can look them over before anything lands in your vault.</p>
+    <p class="prose">At the end, the setup wizard offers to install the <code>scatha</code> command. Say yes: the table below uses it.</p>
     <div class="cmd">
       <button class="btn primary" type="button" id="download">Download my-setup.json</button>
-      <button class="btn" type="button" id="copyJson">Copy it instead</button>
+      <button class="btn" type="button" id="copyJson">Copy It Instead</button>
       <span class="muted" id="dlNote" aria-live="polite"></span>
     </div>
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -166,7 +168,7 @@ td:first-child { width: 42%; }
       </span>
     </div>
     <div class="cmd"><code id="cmd"></code><button class="btn small" type="button" id="copyCmd">Copy</button></div>
-    <p class="muted">Run it from the folder you downloaded the project to, and point <code>--answers</code> at wherever my-setup.json landed.</p>
+    <p class="muted" id="cmdNote"></p>
     <details>
       <summary class="muted" style="cursor:pointer">What's in the file</summary>
       <div class="out" id="out"></div>
@@ -176,7 +178,7 @@ td:first-child { width: 42%; }
   <section class="sheet" aria-labelledby="h6s">
     <h2 id="h6s"><span class="n">06</span>Later on</h2>
     <div class="tablewrap"><table id="later"></table></div>
-    <p class="muted">The runbook (<code>docs/RUNBOOK.md</code>) has the rest: logs, costs, what to do when something breaks.</p>
+    <p class="muted">The runbook (<code>RUNBOOK.md</code>, in the <b>docs</b> folder next to this page) has the rest: logs, costs, and what to do when something breaks.</p>
   </section>
 </div>
 
@@ -199,20 +201,23 @@ td:first-child { width: 42%; }
     { label: "Cooking", description: "Recipes, techniques, and food knowledge." },
   ];
   const CHECKS = [
-    ["node", "Node.js 22 or newer installed (nodejs.org)"],
-    ["uv", "uv installed (the setup script prints the one-line install if it's missing)"],
-    ["x", "Logged in to x.com in your browser (the wizard walks you through copying two cookies). One account for now; support for several is on the roadmap but not built yet"],
+    ["node", "Node.js installed: the LTS version from nodejs.org (22 or newer)"],
+    ["uv", "uv installed (the README has the one line that installs it)"],
+    ["claude", "Claude Code installed and logged in, or an Anthropic API key (you pick in step 03)"],
     ["typesafe", "A TypeSafe API key for Jev, the sorter (typesafe.ai; a few cents covers hundreds of bookmarks)"],
-    ["claude", "Claude Code installed and logged in, or an Anthropic API key (pick in step 03)"],
-    ["obsidian", "Obsidian, if you want notes in a vault (optional: plain folders work too)"],
+    ["x", "Logged in to x.com in your browser. The setup wizard shows you how to copy two cookies from it. (One X account for now; support for several is on the roadmap, but not built yet.)"],
+    ["obsidian", "Obsidian, if you want notes in a vault (optional: the notes are plain Markdown, so any folder works)"],
   ];
   const LATER = [
-    ["The log or ping says the import stopped (expired login, Claude moved)", "setup   (it goes straight to what's broken)"],
-    ["Change topics, folders, the schedule, or anything else", "setup   (when everything works, it asks what to change)"],
-    ["Check every step without changing anything", "setup status"],
-    ["Run it right now instead of waiting", "the run command in the runbook"],
-    ["Stop the schedule", "setup unschedule"],
-    ["Uninstall (it lists everything and removes only what you pick)", "setup uninstall"],
+    ["See what happened, and what you can do about it", "scatha"],
+    ["A run stopped (the status note or the phone ping says why)", "scatha setup   (it goes straight to what's broken)"],
+    ["Sort Unsorted bookmarks, and check the close calls", "scatha review"],
+    ["Look for a topic your Unsorted bookmarks share", "scatha discover"],
+    ["Run an import now instead of waiting for the schedule", "scatha run"],
+    ["Change topics, folders, the schedule, or a login", "scatha setup"],
+    ["Check every step without changing anything", "scatha setup status"],
+    ["Stop the schedule", "scatha setup unschedule"],
+    ["See everything Scatha put on your computer, and remove what you pick", "scatha uninstall"],
   ];
 
   const $ = s => document.querySelector(s);
@@ -288,7 +293,7 @@ td:first-child { width: 42%; }
     if (!state.topics.length) { $("#tree").textContent = "(add a topic to see this)"; return; }
     const groups = {};
     for (const t of state.topics) {
-      const d = destOf(t) || join("(the wizard will ask)", t.sub ?? folderName(t.label)), cut = Math.max(d.lastIndexOf("\\"), d.lastIndexOf("/"));
+      const d = destOf(t) || join("(the setup wizard will ask)", t.sub ?? folderName(t.label)), cut = Math.max(d.lastIndexOf("\\"), d.lastIndexOf("/"));
       (groups[d.slice(0, cut) || d] ||= []).push(d.slice(cut + 1) + "   ← " + t.label);
     }
     $("#tree").textContent = Object.entries(groups).map(([root, kids]) =>
@@ -334,7 +339,7 @@ td:first-child { width: 42%; }
   // ---- output ----
   function answers() {
     return {
-      _about: "Answers for the scatha setup wizard. No secrets in here, on purpose.",
+      _about: "Answers for the Scatha setup wizard. No secrets in here, on purpose.",
       topics: state.topics.filter(t => t.label.trim()).map(t => ({
         label: t.label.trim(), description: (t.description || "").trim(), preset: !!t.preset, destination: destOf(t) })),
       draft_definitions: true,
@@ -348,10 +353,15 @@ td:first-child { width: 42%; }
   const json = () => JSON.stringify(answers(), null, 2);
   function renderOut() {
     $("#out").textContent = json();
-    const cmd = { win: ".\\setup.ps1 --answers $HOME\\Downloads\\my-setup.json",
+    // The Windows line matches the README's Step 5: it runs even where scripts are blocked by default.
+    const cmd = { win: "powershell -ExecutionPolicy Bypass -File setup.ps1 --answers $HOME\\Downloads\\my-setup.json",
                   mac: "./setup.sh --answers ~/Downloads/my-setup.json",
                   linux: "./setup.sh --answers ~/Downloads/my-setup.json" }[state.os];
     $("#cmd").textContent = cmd;
+    const where = state.os === "win" ? "PowerShell in the Scatha folder (README, Step 3)" : "a terminal in the Scatha folder";
+    $("#cmdNote").textContent = `Open ${where}, paste this line, and press Enter. Leave my-setup.json in Downloads: ` +
+      "the setup wizard reads it once, and you can delete it afterward. (If your browser saves downloads somewhere else, change that part of the line.)" +
+      (state.os === "mac" ? " One warning: the macOS path is written to spec and has never run, because I don't have a Mac. If you're the first, tell me how it went." : "");
     document.querySelectorAll(".os button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.os === state.os)));
   }
   document.querySelectorAll(".os button").forEach(b => b.addEventListener("click", () => { state.os = b.dataset.os; save(); }));
@@ -371,7 +381,7 @@ td:first-child { width: 42%; }
   });
   async function copy(text, note) {
     try { await navigator.clipboard.writeText(text); note.textContent = "Copied."; }
-    catch { note.textContent = "Couldn't reach the clipboard; select the text and copy it."; }
+    catch { note.textContent = "The clipboard didn't respond. Select the text and copy it yourself."; }
   }
   $("#copyJson").addEventListener("click", () => { const p = problems(); if (p) { $("#dlNote").textContent = p; return; } copy(json(), $("#dlNote")); });
   $("#copyCmd").addEventListener("click", () => copy($("#cmd").textContent, $("#dlNote")));
