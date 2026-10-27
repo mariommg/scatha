@@ -57,7 +57,7 @@ $env:PYTHONIOENCODING = 'utf-8'
 $env:{app.HOME_ENV} = '{home}'
 $logDir = '{home / "work" / "logs"}'
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
-$log = Join-Path $logDir ((Get-Date -Format 'yyyy-MM-dd_HHmm') + '.log')
+$log = Join-Path $logDir ((Get-Date -Format 'yyyy-MM-dd_HHmmss') + '.log')
 & '{uv}' run --project '{repo / "router"}' python -m jev_router.run @args *>&1 |
     ForEach-Object {{ "$_" }} | Out-File -FilePath $log -Encoding utf8
 exit $LASTEXITCODE
@@ -70,7 +70,7 @@ def wrapper_sh(home: Path, repo: Path, uv: str) -> str:
 export {app.HOME_ENV}="{home}"
 export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:$HOME/.local/bin"
 mkdir -p "{home}/work/logs"
-log="{home}/work/logs/$(date +%Y-%m-%d_%H%M).log"
+log="{home}/work/logs/$(date +%Y-%m-%d_%H%M%S).log"
 "{uv}" run --project "{repo}/router" python -m jev_router.run "$@" >"$log" 2>&1
 """
 

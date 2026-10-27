@@ -64,3 +64,18 @@ def test_a_bookmark_between_the_thresholds_goes_to_unsorted(world, monkeypatch):
     assert len(list((vault / "Unsorted").glob("*.md"))) == 1
     assert set(review.collect_bookmarks(app.work())) == {"1"}
     assert report.history()[-1]["unsorted"] == 1
+
+
+def test_two_runs_in_one_minute_keep_both_saved_batches(world, monkeypatch):
+    class Fixed(run.dt.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 10, 27, 12, 34, 10, tzinfo=tz)
+    monkeypatch.setattr(run.dt, "datetime", Fixed)
+    routed_as(monkeypatch, "skip", "ai", {"ai": .1})
+    for i in (1, 2):
+        (app.work() / "pending-bookmarks.json").write_text(json.dumps({"bookmarks": [bm(i)]}))
+        assert run.main([]) == 0
+    assert set(review.ledger(app.work())) == {"1", "2"}
+    assert set(review.collect_bookmarks(app.work())) == {"1", "2"}
+    assert sorted(d.name for d in (app.work() / "runs").iterdir()) == ["2026-10-27_1234", "2026-10-27_1234-2"]

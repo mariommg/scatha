@@ -20,6 +20,7 @@ import re
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 import urllib.request
 
 from . import Taxonomy, app, checks, notes, report, unsorted
@@ -66,6 +67,19 @@ def smaug_env(cfg: dict) -> dict:
         "AUTO_INVOKE_CLAUDE": "false",
         "AUTO_INVOKE_OPENCODE": "false",
     }
+
+
+def new_run_dir(w: Path, stamp: str) -> Path:
+    """A run folder no other run has: two runs in the same minute must not share (and overwrite) one."""
+    (w / "runs").mkdir(parents=True, exist_ok=True)
+    for n in range(1, 1000):
+        d = w / "runs" / (stamp if n == 1 else f"{stamp}-{n}")
+        try:
+            d.mkdir()
+            return d
+        except FileExistsError:
+            continue
+    raise FileExistsError(f"no free run folder for {stamp}")
 
 
 LOCK_STALE = dt.timedelta(hours=6)
@@ -156,7 +170,7 @@ def main(argv: list[str] | None = None) -> int:
     w = app.work()
     w.mkdir(parents=True, exist_ok=True)
     pending, lock, last_ok = w / "pending-bookmarks.json", w / ".run.lock", w / ".last-success"
-    run_dir = w / "runs" / dt.datetime.now().strftime("%Y-%m-%d_%H%M")
+    stamp = dt.datetime.now().strftime("%Y-%m-%d_%H%M")
 
     min_days = MIN_DAYS.get(cfg["schedule"].get("cadence", "weekly"), 0)
     if min_days and not args.force and last_ok.exists():
@@ -203,8 +217,7 @@ def main(argv: list[str] | None = None) -> int:
             log(f"could not read bookmark {f.get('id')}: {f.get('error')}")
         if not batch_file.get("bookmarks"):
             if unread:
-                run_dir.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(pending), run_dir / "pending-bookmarks.json")
+                shutil.move(str(pending), new_run_dir(w, stamp) / "pending-bookmarks.json")
                 ping(cfg, f"Bookmark import: {len(unread)} new bookmarks couldn't be read and will retry next run. "
                           "The newest log in the data folder has details.")
                 return 1
@@ -215,6 +228,7 @@ def main(argv: list[str] | None = None) -> int:
         log(f"{len(bookmarks)} bookmarks to process" + (f" ({len(unread)} couldn't be read)" if unread else ""))
 
         # 3. Images -> text, 4. route, 5. notes
+        run_dir = new_run_dir(w, stamp)
         notes.cmd_describe(argparse.Namespace(pending=str(pending)))
         results = asyncio.run(route_file(pending, tax_path, run_dir))
         summary = notes.cmd_write(argparse.Namespace(
