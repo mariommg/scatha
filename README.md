@@ -43,7 +43,7 @@ From there, it's your call:
 
 ## Getting started on Windows
 
-Scatha doesn't come with an installer you can double-click. Instead, you'll copy a few lines into a window and answer some questions. It takes about 20 minutes, and these steps cover every click. (On a Mac or Linux? Skip to [macOS and Linux](#getting-started-on-macos-or-linux).)
+Scatha doesn't come with an installer you can double-click. Instead, you'll copy a few lines into a window and answer some questions. It takes about 20 minutes. (On a Mac or Linux? Skip to [macOS and Linux](#getting-started-on-macos-or-linux).)
 
 You don't need a GitHub account, and you won't need to touch any code.
 
@@ -58,7 +58,7 @@ Install these three, in this order.
    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
    ```
 
-   When it says it's done, close the PowerShell window. Windows only sees a newly installed tool in windows you open *after* installing it.
+   When it's done, close the window. (New tools only show up in windows opened afterward.)
 3. **Claude Code.** Install it by following the Windows steps at [claude.com/claude-code](https://claude.com/claude-code). Then open a *new* PowerShell window, type `claude`, press **Enter**, and log in with your Claude account. Close the window when you're done.
 
 While you're at it, get your **TypeSafe API key** from [typesafe.ai](https://typesafe.ai), and make sure you're **logged in to X** in your browser. Setup asks for both.
@@ -69,10 +69,10 @@ While you're at it, get your **TypeSafe API key** from [typesafe.ai](https://typ
 2. Open your **Downloads** folder in File Explorer. Right-click `scatha-master.zip` and choose **Extract All...**
 3. In the window that opens, click **Browse...**, click **Documents**, and click **Select Folder**. Then click **Extract**.
 
-You now have a folder called `scatha-master` in your **Documents** folder. This is the **Scatha folder**. The rest of these steps happen inside it.
+That gives you a `scatha-master` folder in Documents: the **Scatha folder**, from here on.
 
 > [!IMPORTANT]
-> **Leave the Scatha folder where it is.** The Scatha folder *is* the program. Every scheduled run starts from it. If you move, rename, or delete the Scatha folder later, the schedule stops working. (If you do move it, open PowerShell in its new spot, as in Step 3, and run `powershell -ExecutionPolicy Bypass -File setup.ps1 schedule`.)
+> **Leave the Scatha folder where it is.** It *is* the program, and the schedule runs from it. If you move, rename, or delete the Scatha folder later, the schedule stops working. (If you do move it, open PowerShell in its new spot, as in Step 3, and run `powershell -ExecutionPolicy Bypass -File setup.ps1 schedule`.)
 >
 > This only goes for the Scatha folder. The ZIP file, and the setup file you'll make in Step 4, can stay in Downloads or go in the trash.
 
@@ -80,9 +80,7 @@ Comfortable with git? `git clone https://github.com/mariommg/scatha.git` into a 
 
 ### Step 3: Open PowerShell in the Scatha folder
 
-1. In File Explorer, open **Documents**, then double-click the **scatha-master** folder. You should see files like `README.md` and `setup.ps1`.
-2. Right-click an empty spot in that folder (not on a file) and choose **Open in Terminal**. On Windows 10, hold **Shift** while you right-click, and choose **Open PowerShell window here**.
-3. A window opens. Its last line should end with `scatha-master>`. That's how you know you're in the right place.
+In File Explorer, open the Scatha folder, right-click an empty spot (not on a file), and choose **Open in Terminal**. On Windows 10, hold **Shift** while you right-click, and choose **Open PowerShell window here**.
 
 Keep this window open for Step 5.
 
@@ -96,7 +94,7 @@ Rather answer the questions in setup itself? Skip this step.
 
 ### Step 5: Run setup
 
-Go back to the PowerShell window from Step 3. Copy **one** of these lines, paste it in, and press **Enter**.
+In the PowerShell window from Step 3, paste **one** of these lines and press **Enter**.
 
 If you made `my-setup.json` in Step 4:
 
