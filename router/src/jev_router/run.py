@@ -179,6 +179,18 @@ def main(argv: list[str] | None = None) -> int:
             log(f"last run was {since.days} days ago; cadence wants {min_days}+. Skipping.")
             return 0
 
+    def stopped(stage: str, problems: list[str]) -> None:
+        """A run that ends before importing anything still reaches the report and the status note."""
+        if args.preview:
+            return
+        report.record_stop(stage, problems)
+        try:
+            note = report.write_note(cfg)
+        except Exception as e:  # a broken topics file, say: `scatha` still shows the stop
+            note = None
+            log(f"status note: {type(e).__name__}: {e}")
+        log(f"status note: {note}" if note else "status note: could not write it")
+
     token = take_lock(lock)
     if token is None:
         log("another run holds the lock; exiting")
@@ -196,6 +208,7 @@ def main(argv: list[str] | None = None) -> int:
             ping(cfg, f"Bookmark import stopped before fetching: {'; '.join(problems)}. To fix it, run "
                        f"{app.setup_command()} in {app.REPO}; setup finds what's broken and asks only about that. "
                        "Nothing was lost: the next run picks up where this one would have.")
+            stopped("preflight", problems)
             return 2
 
         # 2. Fetch, or resume a run that stopped after fetching
@@ -207,6 +220,7 @@ def main(argv: list[str] | None = None) -> int:
                            app.REPO / "smaug", env=smaug_env(cfg))
             if code != 0:
                 ping(cfg, "Bookmark import failed while fetching from X. The newest log in the data folder has details.")
+                stopped("fetch", ["Fetching your bookmarks from X failed."])
                 return 3
             m = re.search(r"Limiting to \d+ of (\d+) unprocessed", out)
             remaining = int(m.group(1)) - batch if m else 0
@@ -220,9 +234,12 @@ def main(argv: list[str] | None = None) -> int:
                 shutil.move(str(pending), new_run_dir(w, stamp) / "pending-bookmarks.json")
                 ping(cfg, f"Bookmark import: {len(unread)} new bookmarks couldn't be read and will retry next run. "
                           "The newest log in the data folder has details.")
+                stopped("read", [f"None of the {len(unread)} new bookmarks could be read from X."])
                 return 1
             ping(cfg, "Bookmark import: no new bookmarks this time.")
             last_ok.touch()
+            if not args.preview:
+                report.clear_stop()
             return 0
         bookmarks = {str(b["id"]): b for b in batch_file["bookmarks"]}
         log(f"{len(bookmarks)} bookmarks to process" + (f" ({len(unread)} couldn't be read)" if unread else ""))
@@ -245,6 +262,7 @@ def main(argv: list[str] | None = None) -> int:
             shutil.move(str(pending), run_dir / "pending-bookmarks.json")
             ping(cfg, f"Bookmark import: reading the images of {len(unseen)} bookmarks failed. "
                       "They will retry next run. The newest log in the data folder has details.")
+            stopped("read", [f"Reading the images of all {len(unseen)} new bookmarks failed."])
             return 1
         results = asyncio.run(route_file(pending, tax_path, run_dir))
         summary = notes.cmd_write(argparse.Namespace(
@@ -287,6 +305,12 @@ def main(argv: list[str] | None = None) -> int:
                                0 if args.preview else report.new_unsorted()))
         log(f"note-writer tokens this run: {summary['tokens']:,}")
         return 1 if failed else 0
+    except Exception as e:
+        try:
+            stopped("crash", [f"The run hit an unexpected error: {type(e).__name__}: {str(e)[:200]}"])
+        except Exception:
+            pass  # the original error matters more
+        raise
     finally:
         release_lock(lock, token)
 

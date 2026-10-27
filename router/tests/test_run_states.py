@@ -114,4 +114,45 @@ def test_when_every_image_read_fails_nothing_is_ledgered(world, monkeypatch):
     assert run.main([]) == 1
     led = app.work() / "ingested.md"
     assert not led.exists() or "status/1" not in led.read_text()
-    assert not (app.work() / "pending-bookmarks.json").exists()  # saved with the run, not resumed as if new
+    assert not (app.work() / "pending-bookmarks.json").exists()
+
+
+# Finding 10: a run that stopped early left the report and status note showing the last success.
+
+def test_a_stopped_run_shows_in_the_report_with_steps_to_try(world, monkeypatch):
+    data, vault, cfg = world
+    report.record_run({"ai": 5}, 0, 0, 0, "light")
+    report.mark_seen()
+    monkeypatch.setattr(checks, "preflight", lambda cfg: ["your X login has expired (logged out of X?)"])
+    assert run.main([]) == 2
+    text = report.text(app.load_config())
+    assert "The last run stopped" in text and "Your X login has expired" in text
+    steps = text.split("What to try:")[1].split("\n\n")[0].strip().splitlines()
+    assert 2 <= len(steps) <= 3 and "setup x-login" in steps[0]
+    assert "Last successful run" in text and "5 new notes" in text  # the counts aren't replaced or invented
+    page = (vault / "scatha.md").read_text(encoding="utf-8")
+    assert "## The last run stopped" in page and "setup x-login" in page
+    assert "stopped before it imported anything" in report.banner()
+    assert len(report.history()) == 1
+
+
+@pytest.mark.parametrize("stage", ["preflight", "fetch", "read", "crash"])
+def test_every_kind_of_stop_offers_two_or_three_steps(world, stage):
+    assert 2 <= len(report.stop_steps({"stage": stage, "problems": ["something"]})) <= 3
+
+
+def test_the_next_run_that_gets_through_clears_the_stop(world, monkeypatch):
+    data, vault, cfg = world
+    report.record_stop("fetch", ["Fetching your bookmarks from X failed."])
+    routed_as(monkeypatch, "skip", "ai", {"ai": .1})
+    (app.work() / "pending-bookmarks.json").write_text(json.dumps({"bookmarks": [bm(1)]}))
+    assert run.main([]) == 0
+    assert report.last_stop() is None and "The last run stopped" not in report.text(app.load_config())
+
+
+def test_a_crash_is_recorded_and_still_raised(world, monkeypatch):
+    (app.work() / "pending-bookmarks.json").write_text(json.dumps({"bookmarks": [bm(1)]}))
+    monkeypatch.setattr(notes, "cmd_describe", lambda a: (_ for _ in ()).throw(KeyError("boom")))
+    with pytest.raises(KeyError):
+        run.main([])
+    assert report.last_stop()["stage"] == "crash" and "KeyError" in report.last_stop()["problems"][0]  # saved with the run, not resumed as if new

@@ -33,7 +33,58 @@ def record_run(written: dict[str, int], n_unsorted: int, failed: int, remaining:
     history_path().parent.mkdir(parents=True, exist_ok=True)
     with history_path().open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")
+    clear_stop()
     return entry
+
+
+# ---------- a run that stopped before it imported anything ----------
+# Kept apart from the history: it has no counts to show, and the last run that did import stays
+# the one the report counts from. The next run that gets through clears it.
+
+def _stop_path() -> Path:
+    return app.work() / "last-stop.json"
+
+
+def record_stop(stage: str, problems: list[str]) -> None:
+    """stage: "preflight", "fetch", "read" (nothing in the batch could be read), or "crash"."""
+    _stop_path().parent.mkdir(parents=True, exist_ok=True)
+    _stop_path().write_text(json.dumps({"at": dt.datetime.now().isoformat(timespec="seconds"),
+                                        "stage": stage, "problems": problems}), encoding="utf-8")
+
+
+def clear_stop() -> None:
+    _stop_path().unlink(missing_ok=True)
+
+
+def last_stop() -> dict | None:
+    try:
+        return json.loads(_stop_path().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def stop_steps(stop: dict) -> list[str]:
+    """What to try, two or three steps, most likely fix first."""
+    logs = f"Read the newest log in {app.work() / 'logs'}. It shows each step the run took."
+    retry = f"`{app.command('run')}`: try the import again now. (Or wait: the schedule will try again.)"
+    setup = f"`{app.command('setup')}`: check every part. It will ask only about what's broken."
+    if stop["stage"] == "preflight":
+        x = any("X login" in p for p in stop["problems"])
+        first = f"`{app.command('setup x-login')}`: log in to X again." if x else setup
+        return [first, retry, logs]
+    if stop["stage"] == "fetch":
+        return [f"`{app.command('run')}`: try again. (X sometimes refuses for a while; waiting an hour can help.)",
+                setup, logs]
+    if stop["stage"] == "read":
+        return ["Nothing for now: those bookmarks will try again next run.",
+                f"If it happens again, `{app.command('setup')}` will check every part.", logs]
+    return [retry, logs, setup]
+
+
+def stop_lines(stop: dict) -> list[str]:
+    head = f"The last run stopped ({_when(stop['at'])}) before it imported anything:"
+    return [head] + [f"  - {p[:1].upper() + p[1:]}" for p in stop["problems"]] + ["", "What to try:"] + [
+        f"  {n}. {s}" for n, s in enumerate(stop_steps(stop), 1)]
 
 
 def history() -> list[dict]:
@@ -71,6 +122,9 @@ def unseen(runs: list[dict] | None = None) -> dict:
 
 
 def banner() -> str | None:
+    stop = last_stop()
+    if stop and stop["at"] >= last_seen():  # same second: better shown twice than missed
+        return f"The last run stopped before it imported anything. Type `{app.command()}` for what to try."
     u = unseen()
     if not u["runs"] or not (u["notes"] or u["unsorted"] or u["failed"]):
         return None
@@ -93,7 +147,7 @@ def state(cfg: dict) -> dict:
         "unsorted": unsorted.count(cfg, tax) if unsorted.mode(cfg) != "off" else 0,
         "unsorted_dir": unsorted.folder(cfg, tax), "mode": unsorted.mode(cfg),
         "failed": last["failed"] if last else 0, "remaining": last["remaining"] if last else None,
-        "held": unsorted.held_count(), "not_kept": not_kept(), "new_unsorted": new_unsorted(runs),
+        "held": unsorted.held_count(), "not_kept": not_kept(), "new_unsorted": new_unsorted(runs), "stop": last_stop(),
     }
 
 
@@ -180,7 +234,8 @@ def last_run_line(s: dict) -> str:
         return "No runs recorded yet."
     by = ", ".join(f"{n} {s['labels'].get(k, k)}" for k, n in sorted(last["written"].items(), key=lambda kv: -kv[1]))
     total = sum(last["written"].values())
-    line = f"Last run {_when(last['at'])}: {total} new notes" + (f" ({by})" if by else "") + "."
+    run = "Last successful run" if s.get("stop") else "Last run"
+    line = f"{run} {_when(last['at'])}: {total} new notes" + (f" ({by})" if by else "") + "."
     if last["unsorted"]:
         line += f" {last['unsorted']} didn't fit your topics" + (
             " and went to Unsorted." if last.get("unsorted_mode", "light") != "off" else " and weren't kept.")
@@ -192,7 +247,7 @@ def last_run_line(s: dict) -> str:
 def text(cfg: dict) -> str:
     """The full report, for the terminal."""
     s = state(cfg)
-    lines = [f"{app.APP_NAME}", "", last_run_line(s)]
+    lines = [f"{app.APP_NAME}", ""] + (stop_lines(s["stop"]) + [""] if s["stop"] else []) + [last_run_line(s)]
     if s["mode"] != "off":
         lines.append(f"Unsorted now: {s['unsorted']} bookmarks in {s['unsorted_dir']}" if s["unsorted"]
                      else "Unsorted is empty: every bookmark found a topic.")
@@ -221,7 +276,10 @@ def note(cfg: dict) -> str:
     """The status note: the same facts where the user already looks, rewritten every run."""
     s = state(cfg)
     out = ["---", app.STATUS_TAG, f"updated: {dt.datetime.now().isoformat(timespec='minutes')}", "---", "",
-           f"# {app.APP_NAME}", "", "*Rewritten after every run. Edits here are replaced.*", "", last_run_line(s)]
+           f"# {app.APP_NAME}", "", "*Rewritten after every run. Edits here are replaced.*", ""]
+    if s["stop"]:
+        out += ["## The last run stopped", ""] + [l.removeprefix("  ") for l in stop_lines(s["stop"])] + [""]
+    out.append(last_run_line(s))
     if s["mode"] != "off":
         if s["unsorted"]:
             out += ["", f"## Unsorted: {s['unsorted']}", "",
