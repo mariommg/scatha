@@ -73,10 +73,10 @@ def stop_steps(stop: dict) -> list[str]:
         first = f"`{app.command('setup x-login')}`: log in to X again." if x else setup
         return [first, retry, logs]
     if stop["stage"] == "fetch":
-        return [f"`{app.command('run')}`: try again. (X sometimes refuses for a while; waiting an hour can help.)",
+        return [f"`{app.command('run')}`: try again. (X sometimes refuses requests for a while. Waiting an hour can help.)",
                 setup, logs]
     if stop["stage"] == "read":
-        return ["Nothing for now: those bookmarks will try again next run.",
+        return [f"You don't need to do anything now: {app.DISPLAY_NAME} will try those bookmarks again next run.",
                 f"If it happens again, `{app.command('setup')}` will check every part.", logs]
     return [retry, logs, setup]
 
