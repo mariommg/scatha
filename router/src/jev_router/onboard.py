@@ -557,7 +557,8 @@ def _install() -> bool:
     proc = subprocess.run(["uv", "tool", "install", "--force", "--editable", str(app.REPO / "router")],
                           capture_output=True, text=True)
     if proc.returncode != 0:
-        bad(f"Couldn't install it: {(proc.stderr or proc.stdout).strip()[-200:]}")
+        bad(f"{app.DISPLAY_NAME} couldn't install the `{app.APP_NAME}` command. "
+            f"(uv said: {(proc.stderr or proc.stdout).strip()[-200:]})")
         return False
     subprocess.run(["uv", "tool", "update-shell"], capture_output=True, text=True)
     return True
@@ -573,7 +574,7 @@ def repair_command() -> None:
     if src is None or src.exists() or src.resolve() == (app.REPO / "router").resolve():
         return
     say()
-    say(f"  The `{app.APP_NAME}` command points at {src}, which is gone. Pointing it here.")
+    say(f"  The `{app.APP_NAME}` command still points at {src}, which is gone. Pointing it at this folder.")
     if _install():
         ok(f"Fixed. Open a new terminal, then type `{app.APP_NAME}`.")
 
@@ -585,7 +586,8 @@ def install_command() -> bool:
         return True
     say()
     question(f"Install the `{app.APP_NAME}` command?")
-    hint(f"Then `{app.APP_NAME}` works from any folder: it shows what happened and what you can do.")
+    hint(f"With it, you can type `{app.APP_NAME}` in any folder to see what the last runs did and what "
+         "you can do next.")
     if not yes(f"Install `{app.APP_NAME}` now (uv tool install)?"):
         return False
     if not _install():
@@ -598,13 +600,14 @@ def step_schedule(cfg: dict, preset: dict | None = None, batch: int | None = Non
     if preset:
         cfg["schedule"] = preset
     else:
-        pick = choose("How often should it run?", ["Weekly " + dim("(recommended)"), "Every other week", "Daily"])
+        pick = choose(f"How often should {app.DISPLAY_NAME} run?",
+                      ["Weekly  " + dim("(recommended)"), "Every Other Week", "Daily"])
         cadence = {1: "weekly", 2: "biweekly", 3: "daily"}[pick]
         day = "Saturday"
         if cadence != "daily":
             day = scheduler.DAYS[choose("Which day?", scheduler.DAYS, default=7) - 1]
         say()
-        time = ask("What time (24-hour HH:MM)?", default="00:01")
+        time = ask("What time? (24-hour clock, HH:MM)", default="00:01")
         cfg["schedule"] = {"cadence": cadence, "day": day, "time": time}
     try:
         scheduler.validate(cfg["schedule"])
@@ -613,8 +616,9 @@ def step_schedule(cfg: dict, preset: dict | None = None, batch: int | None = Non
         return False
     if batch is None:
         question("How many bookmarks per run?")
-        hint("Each run takes up to this many unprocessed bookmarks, newest first. A big backlog clears a batch")
-        hint("per run. (For one Claude Pro user, 100 notes used about a quarter of a 5-hour window.)")
+        hint(f"Each run takes up to this many bookmarks that {app.DISPLAY_NAME} hasn't read yet, newest first.")
+        hint("A big backlog goes down by one batch per run. (For one Claude Pro user, 100 notes used about")
+        hint("a quarter of a 5-hour window.)")
         batch = int(ask("Batch size", default=str(cfg["batch_size"])))
     cfg["batch_size"] = batch
     app.save_config(cfg)
@@ -622,12 +626,12 @@ def step_schedule(cfg: dict, preset: dict | None = None, batch: int | None = Non
     try:
         ok(scheduler.install(cfg))
     except Exception as e:
-        bad(f"Couldn't register the schedule: {e}")
+        bad(f"{app.DISPLAY_NAME} couldn't set up the schedule. (The error: {e})")
         return False
     if sys.platform == "win32":
-        hint("It runs while you're logged in (a locked screen is fine) and wakes the PC if it's asleep.")
+        hint("It will run while you're logged in (a locked screen is fine). It will wake the PC if it's asleep.")
     elif sys.platform != "darwin" and scheduler.lingering() is False:
-        hint("It only runs while you're logged in. On a server, keep it running after you log out with:")
+        hint("It will only run while you're logged in. On a server, to keep it running after you log out, type:")
         hint("  loginctl enable-linger $USER")
     return True
 
@@ -637,8 +641,8 @@ def step_ntfy(cfg: dict, preset: str | None = None) -> None:
         cfg["ntfy_topic"] = preset
     else:
         question("Want a phone ping after each run? (optional)")
-        hint("Like \"23 new notes, 4 skipped\", through ntfy.sh. Install the ntfy app, subscribe to a topic")
-        hint("name nobody would guess, and enter it here.")
+        hint("Like \"Bookmark import: 23 new notes (14 AI, 9 Humor).\" It comes through ntfy.sh.")
+        hint("Install the ntfy app on your phone. Subscribe to a topic name nobody would guess, then type it here.")
         current = cfg.get("ntfy_topic") or None
         cfg["ntfy_topic"] = ask("ntfy topic (- for none)" if current else "ntfy topic (Enter to skip)",
                                 default=current, clearable=True)
@@ -659,9 +663,9 @@ def step_reader(cfg: dict, preset: str | None = None) -> None:
 
 
 def step_test(cfg: dict) -> None:
-    if not yes("Try it now on your 5 newest bookmarks? Notes go to a preview folder, not your vaults."):
+    if not yes("Try it now on your 5 newest bookmarks? The notes will go to a preview folder, outside your vaults."):
         return
-    hint("Running the scheduled script itself, in a fresh shell, the way the scheduler will (a minute or two)…")
+    hint("Running the scheduled script in a new shell, the same way the scheduler will (a minute or two)…")
     code = scheduler.run_now(["--preview", "--batch", "5", "--force"])
     logs = sorted((app.work() / "logs").glob("*.log"))
     lines = logs[-1].read_text(encoding="utf-8-sig", errors="replace").splitlines() if logs else []
@@ -670,10 +674,11 @@ def step_test(cfg: dict) -> None:
             say(f"    {line.split('] ', 1)[-1]}")
     say()
     if code:
-        bad(f"The test run stopped (exit {code}). The log says why: {logs[-1] if logs else app.work() / 'logs'}")
+        bad(f"The test run stopped (exit code {code}). To see why, open the log: "
+            f"{logs[-1] if logs else app.work() / 'logs'}")
         return
     ok(f"The scheduled script works. Preview notes: {app.work() / 'notes-preview'}")
-    hint("Nothing was recorded, so the first real run picks these up again.")
+    hint(f"{app.DISPLAY_NAME} didn't record these bookmarks, so the first real run will pick them up again.")
 
 
 # ---------- where things stand ----------
@@ -799,25 +804,25 @@ def step_secrets() -> bool:
     if left:
         both = " and ".join(left)
         question(f"Remove {both}?")
-        hint(f"{app.APP_NAME} has its own copy now. {both} stay as environment variables, under the plain names "
+        hint(f"{app.DISPLAY_NAME} has its own copy now. {both} stay as environment variables, under the plain names "
              "that bird and other X tools read. Keep them if you use those tools.")
         if yes(f"Remove {both} from your environment variables?", default=False):
             for p in left:
                 app.delete_user_var(p)
             ok(f"Removed {both}.")
         else:
-            ok(f"Kept {both}. (No harm done: {app.APP_NAME} ignores them now.)")
+            ok(f"Kept {both}. (No harm done: {app.DISPLAY_NAME} ignores them now.)")
     if moved:
-        ok(f"Moved {moved} to {app.KEYCHAIN}. Open a new terminal: this one still has the old copies.")
+        ok(f"Moved {_n(moved, 'secret')} to {app.KEYCHAIN}. Open a new terminal: this one still has the old copies.")
     return True
 
 
 def status() -> None:
     cfg = app.load_config()
-    say(bold(f"{app.APP_NAME} status"))
+    say(bold(f"{app.DISPLAY_NAME} status"))
     say(f"  data folder   {app.home()}")
     if not app.config_path().exists():
-        bad(f"Not set up yet. From {app.REPO}, run {setup_cmd()}")
+        bad(f"{app.DISPLAY_NAME} isn't set up yet. To set it up, open a terminal in {app.REPO} and type {setup_cmd()}")
         return
     hint("Checking the logins (a few seconds)…")
     show_recap(assess(cfg))
@@ -832,7 +837,7 @@ def status() -> None:
     if todo["move"] or todo["copy"]:
         hint(f"Some secrets are plain environment variables. `{setup_cmd('secrets')}` moves them into {app.KEYCHAIN}.")
     elif todo["leftover"]:
-        hint(f"{' and '.join(todo['leftover'])} are also still plain environment variables ({app.APP_NAME} ignores them). "
+        hint(f"{' and '.join(todo['leftover'])} are also still plain environment variables ({app.DISPLAY_NAME} ignores them). "
              f"To remove them: `{setup_cmd('secrets')}`.")
     ledger = app.work() / "ingested.md"
     if ledger.exists():
@@ -848,8 +853,8 @@ def load_answers(path: str | None) -> dict:
     a = json.loads(Path(path).read_text(encoding="utf-8"))
     for bad_key in ("auth_token", "ct0", "typesafe_api_key", "anthropic_api_key"):
         if bad_key in a:
-            raise SystemExit("That answers file contains a secret. Delete it and make a new one; "
-                             "setup always asks for secrets in hidden prompts.")
+            raise SystemExit("That answers file contains a secret. Delete it and make a new one. "
+                             "(Setup always asks for secrets in hidden prompts.)")
     return a
 
 
@@ -859,10 +864,11 @@ def onboard(answers: dict, verify: bool = True) -> int:
     everything works, a menu to change any one step."""
     cfg = app.load_config()
     say()
-    say(cyan(f"{app.APP_NAME} setup"))
+    say(cyan(f"{app.DISPLAY_NAME} setup"))
     say("Your X bookmarks, sorted into your topics and written up as notes, on a schedule.")
-    say(f"Everything you set here lives in {app.home()} (secrets excepted; I'll say where each one goes).")
-    hint("Enter takes the answer in [brackets]. Ctrl+C stops; run setup again to pick up where you left off.")
+    say(f"Everything you set here is saved in {app.home()}, except secrets. Setup will tell you where each "
+        "secret goes.")
+    hint("Enter takes the answer in [brackets]. Ctrl+C stops setup. Run it again to pick up where you left off.")
 
     todo = list(range(1, 7))
     if app.config_path().exists():
@@ -891,23 +897,23 @@ def onboard(answers: dict, verify: bool = True) -> int:
         [c(""), "what happened in the last runs, and what you can do about it"],
         [c("review"), "sort Unsorted bookmarks; check Jev's closest calls"],
         [c("setup"), "check everything; fix what's broken, change anything"],
-        [c("setup x-login"), "fresh X cookies, straight away"],
+        [c("setup x-login"), "new X cookies, right away"],
     ])
     say()
-    hint("The runbook (docs/RUNBOOK.md) covers the rest.")
+    hint(f"The runbook covers the rest: {app.REPO / 'docs' / 'RUNBOOK.md'}")
     return 0
 
 
 def change_menu(cfg: dict, answers: dict, verify: bool) -> int:
     while True:
         say()
-        v = input("  Change something? A step number (1-7, 7 is a test drive), or Enter to finish: ").strip()
+        v = input("  To change a step, type its number (1-7; 7 is a test drive). Or press Enter to finish: ").strip()
         if not v:
             return 0
         if v.isdigit() and int(v) in STEPS:
             run_step(int(v), cfg, answers, verify)
         else:
-            say(dim("  (A number from 1 to 7, or Enter.)"))
+            say(dim("  (Type a number from 1 to 7, or press Enter.)"))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -953,7 +959,7 @@ def main(argv: list[str] | None = None) -> int:
         status()
         return 0
     except (KeyboardInterrupt, EOFError):
-        say(f"\n  Stopped. Steps you finished are saved; run {setup_cmd()} again to finish.")
+        say(f"\n  Stopped. The steps you finished are saved. To finish, type {setup_cmd()} again.")
         return 130
 
 
