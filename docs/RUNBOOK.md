@@ -108,9 +108,9 @@ The desk opens on two kinds of bookmarks:
 - **Unsorted ones,** waiting for a topic.
 - **Close calls,** where two topics scored almost the same, or where the best score sits near the keep line.
 
-For each one, click the topic it belongs in, **Don't keep**, or **Not sure**. Each click is saved right away (in `tuning/verdicts.json`); anything you don't click doesn't count. Keyboard: `j`/`k` to move, `1`-`9` for a topic, `0` for Don't keep, `u` for Not sure.
+For each one, click the topic it belongs in, **Don't Keep**, or **Not Sure**. Each click is saved right away (in `tuning/verdicts.json`); anything you don't click doesn't count. Keyboard: `j`/`k` to move, `1`-`9` for a topic, `0` for **Don't Keep**, `u` for **Not Sure**.
 
-When you press **Done**, the desk offers to write full notes for anything you sorted out of Unsorted, and to remove the light notes you marked Don't keep.
+When you press **Done**, the desk offers to write full notes for anything you sorted out of Unsorted, and to remove the light notes you marked **Don't Keep**.
 
 Posts that aren't in English are shown in English: the note's translation if there is one, otherwise one Haiku translation, saved for next time. The original is a click away.
 

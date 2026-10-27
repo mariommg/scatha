@@ -21,6 +21,7 @@ import re
 from pathlib import Path
 
 from . import Router, Taxonomy, app, desk, notes
+from .report import _n
 from .smaug import bookmark_state
 
 TRANSLATE_BATCH = 8
@@ -298,12 +299,12 @@ def finish_sorting(cfg: dict, say=print, ask=None) -> int:
     ask = ask or (lambda q: input(f"  {q} [Y/n] ").strip().lower() in ("", "y", "yes"))
     light = unsorted.notes_by_id(unsorted.folder(cfg, tax))
     done = 0
-    if to_remove and ask(f"Remove the {len(to_remove)} Unsorted notes you marked Don't keep?"):
+    if to_remove and ask(f"Remove the {_n(len(to_remove), 'Unsorted note')} you marked Don't Keep?"):
         for i in to_remove:
             light[i].unlink(missing_ok=True)
-        say(f"  Removed {len(to_remove)} light notes.")
-    if to_write and ask(f"Write full notes for the {len(to_write)} bookmarks you sorted out of Unsorted? "
-                        f"(Haiku, about 2,000 Claude tokens each)"):
+        say(f"  Removed {_n(len(to_remove), 'light note')}.")
+    if to_write and ask(f"Write full notes for the {_n(len(to_write), 'bookmark')} you sorted out of Unsorted? "
+                        "(Haiku writes them, about 2,000 Claude tokens each.)"):
         done = write_up(cfg, to_write, say)
     report.write_note(cfg)
     return done
@@ -336,7 +337,8 @@ def write_up(cfg: dict, to_write: dict[str, str], say=print) -> int:
             light[i].unlink(missing_ok=True)
     set_ledger(app.work(), written)
     done = len(result["written"])
-    say(f"  {done} full notes written" + (f"; {len(result['failed'])} failed (try again later)." if result["failed"] else "."))
+    say(f"  Wrote {_n(done, 'full note')}." + (f" {len(result['failed'])} failed. (You can try again later.)"
+                                               if result["failed"] else ""))
     return done
 
 
@@ -364,7 +366,7 @@ def import_legacy(path: Path, tax: Taxonomy, store: desk.Verdicts, say=print) ->
             rec["accept"] = [k for k in accept_map[bucket] if k in keys]
         store.put(bid, rec)
         n += 1
-    say(f"  Carried over {n} answers from {source} (shown as unconfirmed on the desk).")
+    say(f"  Carried over {_n(n, 'answer')} from {source}. (The desk shows them as unconfirmed.)")
     return n
 
 
@@ -374,7 +376,8 @@ def main(cfg: dict, rebuild: bool = False, import_file: str | None = None, open_
     deck_file = deck_path()
     stale = deck_file.exists() and json.loads(deck_file.read_text(encoding="utf-8")).get("topics_hash") != current
     if stale and not rebuild:
-        say(f"  Your topics changed since the desk was built; `{app.command('review --rebuild')}` re-scores everything.")
+        say("  Your topics changed after the desk was built, so its scores are out of date. "
+            f"To re-score everything, type `{app.command('review --rebuild')}`.")
     else:
         app.haiku_env(cfg)
         build(cfg, say, reuse=not rebuild)

@@ -1,12 +1,12 @@
 """The `scatha` command.
 
-    scatha                 what happened, and what you can do about it
+    scatha                 what happened in the last runs, and what you can do about it
     scatha review          the sorting desk (sort Unsorted, check Jev's close calls)
-    scatha discover        topics your bookmarks need that you haven't named, and adding them
-                           (--pool: just list the bookmarks; --last: decide on the last run again)
+    scatha discover        find topics your bookmarks need that you haven't named yet, and add them
+                           (free: --pool lists those bookmarks; --last shows the last run again)
     scatha run             import a batch now (same as the schedule; --preview, --batch N)
     scatha setup [step]    the setup wizard (x-login, topics, schedule, status, secrets, unschedule)
-    scatha uninstall       list what scatha put on this machine; remove only what you pick
+    scatha uninstall       list what Scatha put on this machine, and remove only what you pick
 
 Install once with `uv tool install --editable <repo>/router` (setup offers to); it then
 works from any folder and follows this checkout.
@@ -36,7 +36,7 @@ def main(argv: list[str] | None = None) -> int:
         from . import uninstall
         return uninstall.main(argv)
     if not app.config_path().exists() and cmd != "setup":
-        print(f"{app.APP_NAME} isn't set up yet. Type `{app.command('setup')}` to start.")
+        print(f"{app.DISPLAY_NAME} isn't set up yet. To start, type `{app.command('setup')}`.")
         return 1
     if cmd in ("run", "setup"):
         line = report.banner()

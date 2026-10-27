@@ -136,15 +136,15 @@ details.extra .quote { margin-top: 6px; }
       <h1 id="title">Sorting Desk</h1>
       <button class="btn primary" id="done" type="button">Done</button>
     </div>
-    <p class="lede">For each item, click the topic it belongs in. Pick <b>Don't keep</b> if it fits none of them, or <b>Not sure</b> if you're torn (a note helps). Only what you click counts: an item you leave alone is not taken as agreeing with Jev. Each click is saved right away. Sorting a bookmark out of <b>Unsorted</b> writes its full note when you press Done (you'll be asked first in the terminal).</p>
-    <p class="banner" id="stale" hidden>Your topic definitions changed after these scores were made. The scores below are for the old definitions. Close the desk and rebuild it to re-score.</p>
+    <p class="lede">For each bookmark, click the topic it belongs in. If it fits none of them, click <b>Don't Keep</b>. If you're torn, click <b>Not Sure</b> (a short note helps). Only your clicks count: if you skip a bookmark, Scatha won't assume you agree with Jev. Each click is saved right away. When you press <b>Done</b>, Scatha will write full notes for the bookmarks you sorted out of Unsorted. (It will ask you first, in the terminal.)</p>
+    <p class="banner" id="stale" hidden>Your topic definitions changed after these scores were made. The scores below are for the old definitions. To re-score, close the desk and rebuild it. The terminal shows the command.</p>
     <p class="banner bad" id="fatal" hidden></p>
   </header>
 
   <section>
     <details class="topics" id="topics-box">
       <summary id="topics-sum">Your topics</summary>
-      <p class="fine" style="margin-top:8px">These are the definitions Jev read when it scored. They're read-only here: a changed definition needs a fresh score to mean anything.</p>
+      <p class="fine" style="margin-top:8px">These are the definitions Jev read when it scored. You can't change them here, because a changed definition needs new scores.</p>
       <div class="tgrid" id="topics"></div>
     </details>
   </section>
@@ -154,7 +154,7 @@ details.extra .quote { margin-top: 6px; }
       <div class="filters" role="group" aria-label="Show" id="filters"></div>
       <div class="progress"><span id="prog"></span><span class="meter"><i id="meter"></i></span><span class="save" id="save" aria-live="polite"></span></div>
     </div>
-    <p class="keys">Keys: <kbd>j</kbd>/<kbd>k</kbd> next/previous · <kbd>1</kbd>-<kbd>9</kbd> topic · <kbd>0</kbd> don't keep · <kbd>u</kbd> not sure · <kbd>x</kbd> clear · <kbd>o</kbd> original text</p>
+    <p class="keys">Keys: <kbd>j</kbd>/<kbd>k</kbd> next/previous · <kbd>1</kbd>-<kbd>9</kbd> topic · <kbd>0</kbd> Don't Keep · <kbd>u</kbd> Not Sure · <kbd>x</kbd> clear · <kbd>o</kbd> original text</p>
     <div class="slips" id="slips"></div>
   </section>
 </div>
@@ -189,8 +189,8 @@ function colorVars(i) {
   return `--cl:hsl(${h} 58% 40%);--cd:hsl(${h} 72% 70%)`;
 }
 function label(key) {
-  if (key === "drop") return "Don't keep";
-  if (key === "unsure") return "Not sure";
+  if (key === "drop") return "Don't Keep";
+  if (key === "unsure") return "Not Sure";
   return topicByKey[key]?.label || key;
 }
 
@@ -210,8 +210,8 @@ async function load() {
   catch (e) {
     const f = $("fatal");
     f.hidden = false;
-    f.textContent = TOKEN ? `Couldn't load the desk (${e.message}). Is the terminal that opened it still running?`
-                          : "This page needs the full link from the terminal (it carries a key after the #).";
+    f.textContent = TOKEN ? `The desk didn't load (${e.message}). Check that the terminal that opened it is still running.`
+                          : "This page needs the full link from the terminal. (The link carries a key after the #.)";
     return;
   }
   deck = data.deck; verdicts = data.verdicts || {};
@@ -238,7 +238,7 @@ function renderTopics() {
 }
 
 const FILTERS = [
-  ["close", "Close calls", (it) => it.close],
+  ["close", "Close Calls", (it) => it.close],
   ["unsorted", "Unsorted", (it) => !it.filed],
   ["open", "Unanswered", (it) => !verdicts[it.id]?.verdict],
   ["done", "Answered", (it) => !!verdicts[it.id]?.verdict],
@@ -310,23 +310,23 @@ function slip(it) {
   node.append(text);
   if (it.original) {
     let showing = false;
-    const btn = el("button", { class: "textlink", type: "button", "data-orig": "1" }, `Show original (${langName(it.language)})`);
+    const btn = el("button", { class: "textlink", type: "button", "data-orig": "1" }, `Show Original (${langName(it.language)})`);
     btn.onclick = (e) => { e.stopPropagation(); showing = !showing; text.textContent = showing ? it.original : it.text;
-      btn.textContent = showing ? "Show English" : `Show original (${langName(it.language)})`; clampCheck(); };
+      btn.textContent = showing ? "Show English" : `Show Original (${langName(it.language)})`; clampCheck(); };
     node.append(btn);
   }
-  const more = el("button", { class: "textlink", type: "button", hidden: true }, "Show all");
+  const more = el("button", { class: "textlink", type: "button", hidden: true }, "Show All");
   node.append(more);
   const clampCheck = () => {
     text.classList.remove("clamp");
     requestAnimationFrame(() => {
       const long = text.scrollHeight > 230;
-      if (long && more.textContent === "Show all") text.classList.add("clamp");
+      if (long && more.textContent === "Show All") text.classList.add("clamp");
       more.hidden = !long;
     });
   };
-  more.onclick = (e) => { e.stopPropagation(); const open = more.textContent === "Show all";
-    text.classList.toggle("clamp", !open); more.textContent = open ? "Show less" : "Show all"; };
+  more.onclick = (e) => { e.stopPropagation(); const open = more.textContent === "Show All";
+    text.classList.toggle("clamp", !open); more.textContent = open ? "Show Less" : "Show All"; };
   requestAnimationFrame(clampCheck);
 
   if (it.quote) node.append(el("div", { class: "quote" }, it.quote));
@@ -351,7 +351,7 @@ function slip(it) {
   node.append(el("div", { class: "verdict" },
     deck.topics.map((t) => vbtn(t.key, t.label, t.i < 9 ? String(t.i + 1) : null, t.style)),
     el("span", { class: "vsep" }),
-    vbtn("drop", "Don't keep", "0"), vbtn("unsure", "Not sure", "u")));
+    vbtn("drop", "Don't Keep", "0"), vbtn("unsure", "Not Sure", "u")));
 
   const input = el("input", { type: "text", value: v.note || "", placeholder: "Note (optional): why, or what the definitions miss",
     "aria-label": "Note", onclick: (e) => e.stopPropagation(),
@@ -420,9 +420,9 @@ function serverGone() {
   const unsaved = [...queued.keys()].map((id) => deck.items.find((i) => i.id === id)).filter(Boolean);
   const f = $("fatal");
   f.hidden = false;
-  f.textContent = `The desk has stopped running (the terminal window or program that started it closed), so answers can't be saved. ` +
+  f.textContent = `The desk stopped running, so it can't save answers. (The terminal window that started it was probably closed.) ` +
     `Everything that showed "saved" is safe. Not saved: ${unsaved.length} (${unsaved.map((i) => "@" + i.author).join(", ")}). ` +
-    `Run setup review again to reopen the desk at its new address, and answer those again there.`;
+    `To answer those again, reopen the desk from the terminal. It will open at a new address.`;
   gone = true;
   updateProgress();
 }
@@ -463,14 +463,15 @@ $("done").onclick = async () => {
   for (let i = 0; i < 50 && (queued.size || [...saving.values()].some((s) => s === "saving")); i++) await new Promise((r) => setTimeout(r, 100));
   if (queued.size || saving.size) {
     $("fatal").hidden = false;
-    $("fatal").textContent = "Some answers haven't saved yet. Wait for \"All saved\" and press Done again.";
+    $("fatal").textContent = "Some answers aren't saved yet. Wait for \"All saved\", then press Done again.";
     return;
   }
   try { await api("/api/done", {}); } catch {}
   closed = true;
   const answered = Object.values(verdicts).filter((v) => v.verdict).length;
   $("app").replaceChildren(el("div", { class: "closed" }, el("h1", {}, "Desk closed"),
-    el("p", { class: "lede" }, `${answered} answers are saved in ${window.VERDICTS_PATH}. Check the terminal: if you sorted anything out of Unsorted, it asks whether to write those notes now. You can close this tab.`)));
+    el("p", { class: "lede" }, `${answered === 1 ? "Your 1 answer is" : `Your ${answered} answers are`} saved in ${window.VERDICTS_PATH}. ` +
+      `If you sorted bookmarks out of Unsorted or clicked Don't Keep, the terminal will now ask what to do with those notes. You can close this tab.`)));
 };
 
 load();
