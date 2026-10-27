@@ -150,6 +150,19 @@ def test_the_next_run_that_gets_through_clears_the_stop(world, monkeypatch):
     assert report.last_stop() is None and "The last run stopped" not in report.text(app.load_config())
 
 
+def test_a_run_with_nothing_new_clears_the_stop_in_the_vault_too(world, monkeypatch):
+    # 2026-10-27 retest, finding B: the terminal cleared, the status note kept "The last run stopped"
+    data, vault, cfg = world
+    report.record_run({"ai": 5}, 0, 0, 0, "light")
+    report.record_stop("fetch", ["Fetching your bookmarks from X failed."])
+    page = report.write_note(cfg)
+    assert "The last run stopped" in page.read_text(encoding="utf-8")
+    monkeypatch.setattr(run, "sh", lambda *a, **k: (0, ""))  # the fetch works and finds nothing new
+    assert run.main([]) == 0
+    assert report.last_stop() is None and "The last run stopped" not in report.text(app.load_config())
+    assert "The last run stopped" not in page.read_text(encoding="utf-8") and "5 new notes" in page.read_text(encoding="utf-8")
+
+
 def test_a_crash_is_recorded_and_still_raised(world, monkeypatch):
     (app.work() / "pending-bookmarks.json").write_text(json.dumps({"bookmarks": [bm(1)]}))
     monkeypatch.setattr(notes, "cmd_describe", lambda a: (_ for _ in ()).throw(KeyError("boom")))

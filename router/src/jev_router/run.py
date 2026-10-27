@@ -238,8 +238,13 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
             ping(cfg, "Bookmark import: no new bookmarks this time.")
             last_ok.touch()
-            if not args.preview:
-                report.clear_stop()
+            if not args.preview and report.last_stop():
+                report.clear_stop()  # this run got through: the vault note must stop saying otherwise
+                try:
+                    note = report.write_note(cfg)
+                    log(f"status note: {note}" if note else "status note: could not write it")
+                except Exception as e:
+                    log(f"status note: {type(e).__name__}: {e}")
             return 0
         bookmarks = {str(b["id"]): b for b in batch_file["bookmarks"]}
         log(f"{len(bookmarks)} bookmarks to process" + (f" ({len(unread)} couldn't be read)" if unread else ""))
