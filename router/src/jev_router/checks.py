@@ -68,7 +68,7 @@ def verify_notes(cfg: dict) -> str | None:
     """Returns None if Haiku answers through the configured backend, else what went wrong."""
     from . import notes
     if cfg["notes_backend"] == "claude-code" and not found(cfg["tools"]["claude"]):
-        return f"Claude Code isn't at {cfg['tools']['claude']} any more (reinstalled or moved?)"
+        return f"Claude Code isn't at {cfg['tools']['claude']} anymore. (Was it reinstalled or moved?)"
     os.environ["NOTES_BACKEND"] = cfg["notes_backend"]
     os.environ["CLAUDE_BIN"] = cfg["tools"]["claude"]
     try:
@@ -86,9 +86,9 @@ def notes_error_in_words(err: str, backend: str) -> str:
     """verify_notes' error, with the common one (a login that expired) said plainly."""
     if _LOGGED_OUT.search(err):
         if backend == "claude-code":
-            return ("Claude Code isn't logged in, or its login expired. In a terminal, run 'claude', "
-                    "type /login, and sign in")
-        return "the Anthropic API key was rejected"
+            return ("Claude Code isn't logged in, or its login expired. To fix it, open a terminal and type "
+                    "'claude'. Then type /login and sign in.")
+        return "The Anthropic API key was rejected."
     return err[:200]
 
 
@@ -96,13 +96,14 @@ def preflight(cfg: dict) -> list[str]:
     """What a run needs, in plain words: one line per thing that isn't working. Empty means go."""
     problems = []
     if not found(cfg["tools"]["node"]):
-        problems.append(f"Node.js isn't at {cfg['tools']['node']} any more")
+        problems.append(f"Node.js isn't at {cfg['tools']['node']} anymore.")
     elif missing := smaug_missing():
-        problems.append(f"Smaug's packages aren't all installed ({', '.join(missing)}), so it can't fetch")
+        problems.append(f"Smaug's packages aren't all installed ({', '.join(missing)}), so {app.DISPLAY_NAME} "
+                        "can't fetch your bookmarks.")
     elif not verify_x(cfg):
-        problems.append("your X login has expired (logged out of X, or the cookies aged out)")
+        problems.append("Your X login expired. (Maybe you logged out of X, or the cookies got too old.)")
     if err := verify_typesafe():
-        problems.append(f"Jev didn't answer, so the TypeSafe key may be revoked or out of credit ({err[:100]})")
+        problems.append(f"Jev didn't answer. Your TypeSafe key may be revoked, or out of credit. (Jev's error: {err[:100]})")
     if err := verify_notes(cfg):
         writer = "Claude Code" if cfg["notes_backend"] == "claude-code" else "the Anthropic API"
         problems.append(f"Haiku didn't answer through {writer}: {notes_error_in_words(err, cfg['notes_backend'])}")

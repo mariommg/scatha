@@ -448,7 +448,7 @@ def test_missing_packages_are_named_not_blamed_on_x(home, smaug, monkeypatch):
     cfg = app.load_config()
     cfg["tools"]["node"] = str(smaug / "package.json")  # any file that exists
     problems = checks.preflight(cfg)
-    assert problems == ["Smaug's packages aren't all installed (linkedom), so it can't fetch"] and asked_x == []
+    assert problems == ["Smaug's packages aren't all installed (linkedom), so Scatha can't fetch your bookmarks."] and asked_x == []
     assert onboard.assess(cfg)[1] == (False, "Smaug's packages aren't all installed (linkedom)")
 
 

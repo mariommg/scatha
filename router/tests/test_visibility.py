@@ -81,7 +81,7 @@ def test_run_keeps_skipped_bookmarks_as_light_notes_and_reports(fake, monkeypatc
     assert last["unsorted"] == 2 and "ai" in last["written"]  # (the fake note writer writes every bookmark)
     status = (fake.home / "scatha.md").read_text(encoding="utf-8")
     assert "## Unsorted: 2" in status and "review`" in status
-    assert "2 didn't fit your topics; they're in Unsorted" in fake.pings[-1] and "for the full report" in fake.pings[-1]
+    assert "2 didn't fit your topics, so they went to Unsorted." in fake.pings[-1] and "for the full report" in fake.pings[-1]
 
 
 def test_run_with_unsorted_off_keeps_no_notes(fake, monkeypatch):
@@ -92,7 +92,7 @@ def test_run_with_unsorted_off_keeps_no_notes(fake, monkeypatch):
     skipping_route(monkeypatch, {"2"})
     assert run.main([]) == 0
     assert not (fake.home / "Unsorted").exists()
-    assert "1 didn't fit your topics; it wasn't kept" in fake.pings[-1]
+    assert "1 didn't fit your topics, and Scatha didn't keep it." in fake.pings[-1]
 
 
 def test_preview_records_nothing(fake, monkeypatch):
@@ -368,4 +368,4 @@ def test_run_summary_mentions_discovery_only_past_the_line():
     quiet = run.summary_text([], 3, 0, None, labels, new_unsorted=report.DISCOVER_AT - 1)
     loud = run.summary_text([], 3, 0, None, labels, new_unsorted=report.DISCOVER_AT)
     assert "discover" not in quiet
-    assert f"{report.DISCOVER_AT} bookmarks have gone to Unsorted" in loud and "discover`" in loud
+    assert f"{report.DISCOVER_AT} bookmarks went to Unsorted" in loud and "discover`" in loud

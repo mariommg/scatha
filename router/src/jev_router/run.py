@@ -133,20 +133,19 @@ def summary_text(written: list, skipped: int, failed: int, remaining: int | None
                  mode: str = "light", new_unsorted: int = 0) -> str:
     counts = collections.Counter(b for _, b, _ in written)
     parts = ", ".join(f"{n} {labels.get(b, b)}" for b, n in counts.most_common())
-    text = f"Bookmark import: {len(written)} new notes ({parts or 'none'})."
+    text = f"Bookmark import: {report._n(len(written), 'new note')}" + (f" ({parts})." if parts else ".")
     if skipped:
-        if mode != "off":
-            where = "they're in Unsorted" if skipped > 1 else "it's in Unsorted"
-        else:
-            where = "they weren't kept" if skipped > 1 else "it wasn't kept"
-        text += f" {skipped} didn't fit your topics; {where}."
+        one = skipped == 1
+        text += f" {skipped} didn't fit your topics" + (
+            f", so {'it' if one else 'they'} went to Unsorted." if mode != "off"
+            else f", and {app.DISPLAY_NAME} didn't keep {'it' if one else 'them'}.")
     if failed:
-        text += f" {failed} failed and will retry next run."
+        text += f" {report._retry(failed)}."
     if remaining:
-        text += f" {remaining} older bookmarks still queued."
+        text += f" {report._n(remaining, 'older bookmark')} still in the queue."
     if new_unsorted >= report.DISCOVER_AT:
-        text += (f" {new_unsorted} bookmarks have gone to Unsorted since your topics were last checked; "
-                 f"`{app.command('discover')}` looks for a topic they share.")
+        text += (f" {new_unsorted} bookmarks went to Unsorted since you last checked your topics. "
+                 f"`{app.command('discover')}` will look for a topic they share.")
     if skipped or failed:
         text += f" Type `{app.command()}` for the full report and what you can do."
     return text
@@ -205,9 +204,9 @@ def main(argv: list[str] | None = None) -> int:
         if problems:
             for p in problems:
                 log(f"pre-flight: {p}")
-            ping(cfg, f"Bookmark import stopped before fetching: {'; '.join(problems)}. To fix it, run "
-                       f"{app.setup_command()} in {app.REPO}; setup finds what's broken and asks only about that. "
-                       "Nothing was lost: the next run picks up where this one would have.")
+            ping(cfg, f"Bookmark import stopped before fetching. {' '.join(problems)} To fix it, run "
+                       f"{app.setup_command()} in {app.REPO}. Setup will find what's broken and ask only about that. "
+                       "Nothing was lost: the next run will pick up from here.")
             stopped("preflight", problems)
             return 2
 
@@ -219,7 +218,7 @@ def main(argv: list[str] | None = None) -> int:
             code, out = sh([cfg["tools"]["node"], "src/cli.js", "fetch", "1000", "--limit", str(batch)],
                            app.REPO / "smaug", env=smaug_env(cfg))
             if code != 0:
-                ping(cfg, "Bookmark import failed while fetching from X. The newest log in the data folder has details.")
+                ping(cfg, "Bookmark import failed while fetching from X. The newest log in the data folder has the details.")
                 stopped("fetch", ["Fetching your bookmarks from X failed."])
                 return 3
             m = re.search(r"Limiting to \d+ of (\d+) unprocessed", out)
@@ -232,8 +231,8 @@ def main(argv: list[str] | None = None) -> int:
         if not batch_file.get("bookmarks"):
             if unread:
                 shutil.move(str(pending), new_run_dir(w, stamp) / "pending-bookmarks.json")
-                ping(cfg, f"Bookmark import: {len(unread)} new bookmarks couldn't be read and will retry next run. "
-                          "The newest log in the data folder has details.")
+                ping(cfg, f"Bookmark import: none of the {len(unread)} new bookmarks could be read. {app.DISPLAY_NAME} "
+                          "will try them again next run. The newest log in the data folder has the details.")
                 stopped("read", [f"None of the {len(unread)} new bookmarks could be read from X."])
                 return 1
             ping(cfg, "Bookmark import: no new bookmarks this time.")
@@ -265,8 +264,8 @@ def main(argv: list[str] | None = None) -> int:
         bookmarks = {str(b["id"]): b for b in json.loads(pending.read_text(encoding="utf-8"))["bookmarks"]}
         if not bookmarks:  # every one was held back
             shutil.move(str(pending), run_dir / "pending-bookmarks.json")
-            ping(cfg, f"Bookmark import: reading the images of {len(unseen)} bookmarks failed. "
-                      "They will retry next run. The newest log in the data folder has details.")
+            ping(cfg, f"Bookmark import: reading the images of {len(unseen)} bookmarks failed. {app.DISPLAY_NAME} "
+                      "will try them again next run. The newest log in the data folder has the details.")
             stopped("read", [f"Reading the images of all {len(unseen)} new bookmarks failed."])
             return 1
         results = asyncio.run(route_file(pending, tax_path, run_dir))
