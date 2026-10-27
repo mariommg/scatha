@@ -232,9 +232,13 @@ def step_prereqs(cfg: dict) -> bool:
         cfg["tools"]["node"] = node
         ok(f"Node.js {node_major(node)}")
     smaug = app.REPO / "smaug"
-    if ok_ and not (smaug / "node_modules").is_dir():
+    if ok_ and checks.smaug_missing():
         hint("… installing Smaug's packages (one time)")
-        subprocess.run([which("npm") or "npm", "install", "--silent"], cwd=smaug, check=False)
+        proc = subprocess.run([which("npm") or "npm", "install", "--silent"], cwd=smaug, check=False)
+        if proc.returncode != 0 or checks.smaug_missing():
+            bad("Couldn't install Smaug's packages (npm install failed). Check your internet connection,")
+            say("    then run setup again. To see npm's error, type `npm install` in the smaug folder.")
+            ok_ = False
     bird = which("bird")
     if not bird and ok_:
         say()
@@ -259,6 +263,10 @@ def step_x(cfg: dict, verify: bool = True) -> bool:
     say()
     hint("They're the keys to your X session, so treat them like a password. They stop working")
     hint(f"when you log out of X; when that happens, run:  {setup_cmd('x-login')}")
+    if verify and (missing := checks.smaug_missing()):
+        bad(f"Smaug's packages aren't all installed ({', '.join(missing)}), so X can't be checked yet.")
+        say(f"    Run {setup_cmd()} and fix step 1 first.")
+        return False
     handle = verify_x(cfg) if verify and app.has_secret("AUTH_TOKEN") else None
     if handle:
         say()
@@ -668,13 +676,15 @@ def assess(cfg: dict) -> dict[int, tuple[bool, str]]:
     s: dict[int, tuple[bool, str]] = {}
     node = checks.found(cfg["tools"]["node"])
     major = node_major(node) if node else 0
-    s[1] = ((True, f"Node.js {major}" + (", bird backup" if checks.found(cfg["tools"]["bird"]) else ""))
-            if major >= 22 else (False, f"Node.js 22+ not found at {cfg['tools']['node']}"))
+    missing = checks.smaug_missing() if major >= 22 else []
+    s[1] = ((False, f"Node.js 22+ not found at {cfg['tools']['node']}") if major < 22
+            else (False, f"Smaug's packages aren't all installed ({', '.join(missing)})") if missing
+            else (True, f"Node.js {major}" + (", bird backup" if checks.found(cfg["tools"]["bird"]) else "")))
 
     if not app.has_secret("AUTH_TOKEN"):
         s[2] = (False, "not set up yet")
     elif not s[1][0]:
-        s[2] = (False, "can't check without Node.js (step 1)")
+        s[2] = (False, "can't check until step 1 works")
     else:
         handle = verify_x(cfg)
         s[2] = (True, f"X sees {handle}") if handle else (False, "saved cookies stopped working (logged out of X?)")

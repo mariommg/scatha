@@ -408,3 +408,51 @@ def test_an_unreadable_receipt_changes_nothing(tmp_path, monkeypatch):
     assert onboard.installed_source() is None
     onboard.repair_command()
     assert not any(cmd[:3] == ["uv", "tool", "install"] for cmd in ran)
+
+
+# 2026-10-27 pre-release review, finding 9: a failed npm install passed step 1, and Smaug failing to
+# start later looked like rejected X cookies.
+
+@pytest.fixture
+def smaug(tmp_path, monkeypatch):
+    repo = tmp_path / "repo"
+    (repo / "smaug").mkdir(parents=True)
+    (repo / "smaug" / "package.json").write_text(json.dumps({"dependencies": {"dayjs": "^1", "linkedom": "^0.18"}}))
+    monkeypatch.setattr(app, "REPO", repo)
+    monkeypatch.setattr(onboard, "which", lambda name: "/fake/" + name)
+    monkeypatch.setattr(onboard, "node_major", lambda name: 22)
+    return repo / "smaug"
+
+
+def installed(smaug, *names):
+    for n in names:
+        (smaug / "node_modules" / n).mkdir(parents=True)
+        (smaug / "node_modules" / n / "package.json").write_text("{}")
+
+
+def test_a_failed_npm_install_fails_step_1(home, smaug, monkeypatch, capsys):
+    from types import SimpleNamespace
+    installed(smaug, "dayjs")  # half-finished: one package in, so node_modules exists
+    monkeypatch.setattr(onboard.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=1))
+    assert onboard.step_prereqs(app.load_config()) is False
+    assert "Couldn't install Smaug's packages" in capsys.readouterr().out
+
+
+def test_missing_packages_are_named_not_blamed_on_x(home, smaug, monkeypatch):
+    from jev_router import checks
+    installed(smaug, "dayjs")
+    asked_x = []
+    monkeypatch.setattr(checks, "verify_x", lambda cfg, cookies=None: asked_x.append(1))
+    monkeypatch.setattr(checks, "verify_typesafe", lambda: None)
+    monkeypatch.setattr(checks, "verify_notes", lambda cfg: None)
+    cfg = app.load_config()
+    cfg["tools"]["node"] = str(smaug / "package.json")  # any file that exists
+    problems = checks.preflight(cfg)
+    assert problems == ["Smaug's packages aren't all installed (linkedom), so it can't fetch"] and asked_x == []
+    assert onboard.assess(cfg)[1] == (False, "Smaug's packages aren't all installed (linkedom)")
+
+
+def test_all_packages_in_place_passes(home, smaug):
+    from jev_router import checks
+    installed(smaug, "dayjs", "linkedom")
+    assert checks.smaug_missing() == []

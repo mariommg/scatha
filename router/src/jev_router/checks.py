@@ -23,6 +23,18 @@ def found(tool: str) -> str | None:
     return shutil.which(tool) if tool else None
 
 
+def smaug_missing() -> list[str]:
+    """Smaug's packages that aren't installed. A failed or half-finished npm install leaves some out,
+    and Smaug then can't start: that must not look like an X login problem."""
+    import json
+    smaug = app.REPO / "smaug"
+    try:
+        deps = json.loads((smaug / "package.json").read_text(encoding="utf-8")).get("dependencies", {})
+    except (OSError, ValueError):
+        return ["package.json"]
+    return [d for d in deps if not (smaug / "node_modules" / d / "package.json").is_file()]
+
+
 def verify_x(cfg: dict, cookies: tuple[str, str] | None = None) -> str | None:
     """Returns the @handle X sees, or None. cookies: (auth_token, ct0) to test instead of the saved
     ones, under every name the fetcher reads, so a saved copy can't stand in for them."""
@@ -85,6 +97,8 @@ def preflight(cfg: dict) -> list[str]:
     problems = []
     if not found(cfg["tools"]["node"]):
         problems.append(f"Node.js isn't at {cfg['tools']['node']} any more")
+    elif missing := smaug_missing():
+        problems.append(f"Smaug's packages aren't all installed ({', '.join(missing)}), so it can't fetch")
     elif not verify_x(cfg):
         problems.append("your X login has expired (logged out of X, or the cookies aged out)")
     if err := verify_typesafe():

@@ -159,6 +159,7 @@ def x_world(machine, monkeypatch, works):
         seen.append(pair)
         return SimpleNamespace(stdout="user: @me" if pair in works else "", returncode=0)
     monkeypatch.setattr(checks.subprocess, "run", fetcher)
+    monkeypatch.setattr(checks, "smaug_missing", lambda: [])
     return seen, {"tools": {"node": "node", "bird": "bird"}}
 
 
