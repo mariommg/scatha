@@ -8,6 +8,7 @@ stuck item doesn't stop the others. Nothing here touches the real schedule, regi
 checkout: those are faked.
 """
 
+import re
 import shutil
 from pathlib import Path
 
@@ -178,7 +179,40 @@ SCATHAS_OWN = [  # one of everything scatha writes below work/ and tuning/
     "tuning/verdicts.json", "tuning/not-for-me.json", "tuning/desk/deck.json", "tuning/desk/translations.json",
     "tuning/desk/sorted/pending.json", "tuning/desk/sorted/routes.json",
     "tuning/discovery/2026-10-26_1330.json", "tuning/topics_before-r_programming_2026-10-26_1332.yaml",
+    "work/x-query-ids.json", "work/x-features.json",
 ]
+
+
+# 2026-10-27 retest 2: the X client's own cache blocked removal. The list of what scatha writes is kept
+# by hand, so these tie it to the writers: every cache x.js names, and the real cache writer's output.
+
+def test_every_cache_the_x_client_names_is_owned():
+    x_js = (Path(uninstall.__file__).parents[3] / "smaug" / "src" / "x.js").read_text(encoding="utf-8")
+    names = re.findall(r"path\.join\(dir, '([^']+)'\)", x_js)
+    assert names and all(any(o.fullmatch(f"work/{n}") for o in uninstall.OWNED) for n in names), names
+
+
+NODE_WRITER = r"""
+import {pathToFileURL} from 'node:url';
+import path from 'node:path';
+const {createRuntimeQueryIdStore} = await import(pathToFileURL(path.resolve('smaug/vendor/bird/runtime-query-ids.js')).href);
+const fetchImpl = async url => new Response(url.startsWith('https://abs.twimg.com/')
+  ? 'e.exports={queryId:"offlineFixtureQueryId",operationName:"Bookmarks"}'
+  : '<script src="https://abs.twimg.com/responsive-web/client-web/main.fixture.js"></script>');
+await createRuntimeQueryIdStore({cachePath: process.argv[1], fetchImpl}).refresh(['Bookmarks'], {force: true});
+"""
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="needs Node.js")
+def test_the_cache_the_x_client_really_writes_does_not_block_removal(world):
+    import subprocess
+    cache = world["data"] / "work" / "x-query-ids.json"  # x.js puts it beside bookmarks-state.json
+    repo = Path(uninstall.__file__).parents[3]
+    p = subprocess.run(["node", "--input-type=module", "-e", NODE_WRITER, str(cache)], cwd=repo,
+                       capture_output=True, text=True, timeout=60)  # a fake transport: nothing leaves the machine
+    assert p.returncode == 0 and cache.is_file(), p.stderr
+    assert uninstall.data_folder_problem(world["data"], app.load_config()) is None
+    assert uninstall.main(["--remove", "data", "--yes", "--no-copy"]) == 0 and not world["data"].exists()
 
 
 def test_what_scatha_writes_there_is_still_deletable(world):

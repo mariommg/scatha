@@ -57,7 +57,8 @@ class Item:
 _STAMP = r"\d{4}-\d\d-\d\d_\d{4}"
 OWNED = [re.compile(p) for p in (
     r"work/(ingested\.md|pending-bookmarks\.json(\.full)?|bookmarks-state\.json|runs\.jsonl|last-stop\.json"
-    r"|unsorted-seen\.json|\.seen|\.last-success|\.run\.lock)",
+    r"|unsorted-seen\.json|\.seen|\.last-success|\.run\.lock"
+    r"|x-query-ids\.json|x-features\.json)",  # the X client's caches, kept beside Smaug's state (smaug/src/x.js)
     rf"work/logs/({_STAMP}(\d\d)?\.log|launchd\.err)",
     rf"work/runs/{_STAMP}(-\d+)?/(pending-bookmarks\.json|routes\.json|routes\.md)",
     r"tuning/(verdicts|not-for-me)\.json",
