@@ -237,6 +237,18 @@ def secret_home(var: str) -> str | None:
     return "this terminal only" if os.environ.get(var) else None
 
 
+def plain_secrets() -> dict[str, list[str]]:
+    """What `setup secrets` can still do, so the status hint and the step agree: our secrets still in
+    user environment variables (move), older X names with no Credential Manager copy (copy), and
+    older X names left beside a copy (leftover: only the user can say whether other tools need them)."""
+    if _keychain() is None:
+        return {"move": [], "copy": [], "leftover": []}
+    move = stored_user_vars(list(SECRETS.values()))
+    legacy = stored_user_vars(list(LEGACY_X))
+    copied = lambda p: LEGACY_X[p] in move or keychain_get(LEGACY_X[p])
+    return {"move": move, "copy": [p for p in legacy if not copied(p)], "leftover": [p for p in legacy if copied(p)]}
+
+
 def move_to_keychain(var: str, as_name: str | None = None) -> bool:
     """Copy a user environment variable into Credential Manager (under our name for a legacy X one),
     check it took, then delete the plain copy, except a legacy name's: other X tools read it,

@@ -117,6 +117,22 @@ def test_a_save_from_a_test_install_still_reaches_the_real_one(machine, tmp_path
     assert app.os.environ["TYPESAFE_API_KEY"] == "k"
 
 
+def test_kept_plain_x_names_can_still_be_removed_later(machine, monkeypatch):
+    # 2026-10-27: login copied, AUTH_TOKEN/CT0 kept; status kept saying "run setup secrets", which then had nothing to do
+    from jev_router import onboard
+    machine["reg"].update({"AUTH_TOKEN": "a", "CT0": "c"})
+    assert app.plain_secrets() == {"move": [], "copy": ["AUTH_TOKEN", "CT0"], "leftover": []}
+    monkeypatch.setattr(onboard, "yes", lambda prompt, default=True: default)  # Enter on every question
+    onboard.step_secrets()
+    assert machine["reg"] == {"AUTH_TOKEN": "a", "CT0": "c"} and app.keychain_get("TWITTER_CT0") == "c"
+    assert app.plain_secrets() == {"move": [], "copy": [], "leftover": ["AUTH_TOKEN", "CT0"]}
+    asked = []
+    monkeypatch.setattr(onboard, "yes", lambda prompt, default=True: asked.append(prompt) or True)
+    onboard.step_secrets()  # the second time, it offers the removal
+    assert asked and "Remove AUTH_TOKEN and CT0" in asked[0] and machine["reg"] == {}
+    assert not any(app.plain_secrets().values())
+
+
 def test_a_broken_keyring_never_breaks_a_run(machine, monkeypatch):
     class Exploding(FakeKeychain):
         def get_password(self, service, var):

@@ -688,35 +688,39 @@ def step_secrets() -> bool:
         ok("Secrets here live in " + ("secrets.env in your data folder, readable only by you."
                                       if sys.platform != "win32" else "user environment variables (Credential Manager isn't available)."))
         return True
-    ours = app.stored_user_vars(list(app.SECRETS.values()))
-    legacy = {p: n for p, n in app.LEGACY_X.items() if app.stored_user_vars([p]) and not app.secret_home(n)}
-    if not ours and not legacy:
-        ok(f"Nothing to move: no secrets of {app.APP_NAME}'s are in user environment variables.")
+    todo = app.plain_secrets()
+    if not any(todo.values()):
+        ok(f"All set. Your secrets are in {app.KEYCHAIN}, and no plain copies are left.")
         return True
-    question(f"Move your secrets into {app.KEYCHAIN}?")
-    hint("User environment variables are handed to every program you start; Credential Manager gives them only to programs that ask.")
     picks = []
-    for var in ours:
-        hint(USER_VARS[var] + " Moving it removes the environment variable, so other programs stop seeing it.")
-        if yes(f"Move {var}?"):
-            picks.append((var, None))
-    for plain, name in legacy.items():
-        if yes(f"Copy your X login from {plain} into Credential Manager (as {name})?"):
-            picks.append((plain, name))
+    if todo["move"] or todo["copy"]:
+        question(f"Move your secrets into {app.KEYCHAIN}?")
+        hint("Environment variables go to every program you start. Credential Manager gives a secret only to a program that asks for it.")
+        for var in todo["move"]:
+            hint(USER_VARS[var] + " If you move it, the environment variable goes, and other programs do not see it.")
+            if yes(f"Move {var}?"):
+                picks.append((var, None))
+        for plain in todo["copy"]:
+            if yes(f"Copy your X login from {plain} into Credential Manager (as {app.LEGACY_X[plain]})?"):
+                picks.append((plain, app.LEGACY_X[plain]))
     moved = 0
     for var, name in picks:
         if app.move_to_keychain(var, name):
             moved += 1
         else:
-            bad(f"{var}: Credential Manager didn't keep it; left where it was.")
-    kept = [p for p, n in legacy.items() if app.keychain_get(n)]
-    if kept:
-        hint(f"{' and '.join(kept)} are still environment variables too, under the plain names bird and other "
-             f"X tools read. {app.APP_NAME} now uses its own copy.")
-        if yes(f"Remove {' and '.join(kept)} from your environment variables?", default=False):
-            for p in kept:
+            bad(f"{var}: Credential Manager did not keep it. It stays where it was.")
+    left = [p for p in app.LEGACY_X if p in todo["leftover"] or (p in todo["copy"] and app.keychain_get(app.LEGACY_X[p]))]
+    if left:
+        both = " and ".join(left)
+        question(f"Remove {both}?")
+        hint(f"{app.APP_NAME} has its own copy now. {both} stay as environment variables, under the plain names "
+             "that bird and other X tools read. Keep them if you use those tools.")
+        if yes(f"Remove {both} from your environment variables?", default=False):
+            for p in left:
                 app.delete_user_var(p)
-            ok(f"Removed {' and '.join(kept)}.")
+            ok(f"Removed {both}.")
+        else:
+            ok(f"Kept {both}. (No harm done: {app.APP_NAME} ignores them now.)")
     if moved:
         ok(f"Moved {moved} to {app.KEYCHAIN}. Open a new terminal: this one still has the old copies.")
     return True
@@ -738,8 +742,12 @@ def status() -> None:
         legacy = next((p for p, ours in app.LEGACY_X.items() if ours == n), None)
         where = app.secret_home(n) or (legacy and app.secret_home(legacy) and f"{app.secret_home(legacy)} ({legacy})")
         say(f"  {label:<13} kept in {where or 'not saved'}")
-    if app._keychain() and app.stored_user_vars(list(app.SECRETS.values()) + list(app.LEGACY_X)):
+    todo = app.plain_secrets()
+    if todo["move"] or todo["copy"]:
         hint(f"Some secrets are plain environment variables. `{setup_cmd('secrets')}` moves them into {app.KEYCHAIN}.")
+    elif todo["leftover"]:
+        hint(f"{' and '.join(todo['leftover'])} are also still plain environment variables ({app.APP_NAME} ignores them). "
+             f"To remove them: `{setup_cmd('secrets')}`.")
     ledger = app.work() / "ingested.md"
     if ledger.exists():
         say(f"  processed     {sum(1 for l in ledger.read_text(encoding='utf-8').splitlines() if 'x.com/' in l)} bookmarks")
