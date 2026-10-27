@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import datetime as dt
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -49,35 +50,50 @@ class Item:
     note: str = ""      # for listed-only items: why it isn't offered, or how to do it by hand
 
 
-# What scatha writes below work/ and tuning/: these kinds of file, and Markdown only of its own (see _ours_md).
-OURS_INSIDE = {".json", ".jsonl", ".md", ".log", ".yaml", ".seen", ".last-success", ".lock"}
-OURS_MD = {"ingested.md", "routes.md"}  # the ledger and a routing table; every other note carries a tweet_id
+# Every file scatha writes below work/ and tuning/, by where it is (paths relative to the data
+# folder). A file anywhere else there, whatever its kind, isn't provably scatha's, and the data
+# folder isn't offered for deletion. A file type is not ownership: a personal export.json in
+# work/ looks like ours by its extension alone (2026-10-27 retest, finding A).
+_STAMP = r"\d{4}-\d\d-\d\d_\d{4}"
+OWNED = [re.compile(p) for p in (
+    r"work/(ingested\.md|pending-bookmarks\.json(\.full)?|bookmarks-state\.json|runs\.jsonl|last-stop\.json"
+    r"|unsorted-seen\.json|\.seen|\.last-success|\.run\.lock)",
+    rf"work/logs/({_STAMP}(\d\d)?\.log|launchd\.err)",
+    rf"work/runs/{_STAMP}(-\d+)?/(pending-bookmarks\.json|routes\.json|routes\.md)",
+    r"tuning/(verdicts|not-for-me)\.json",
+    r"tuning/desk/(deck|translations)\.json",
+    r"tuning/desk/sorted/(pending|routes)\.json",
+    rf"tuning/discovery/{_STAMP}\.json",
+    rf"tuning/topics_before-[a-z0-9_]+_{_STAMP}\.yaml",
+)]
+# Notes from preview runs: owned only if the note itself says so (it carries a tweet_id).
+PREVIEW_NOTES = re.compile(r"(work/notes-preview|tuning/desk/sorted/preview)/([^/]+/)*[^/]+\.md")
 
 
-def _ours_md(path: Path) -> bool:
-    if path.name in OURS_MD:
-        return True
+def _preview_note(path: Path) -> bool:
     try:
         head = path.read_text(encoding="utf-8", errors="ignore")[:2000]
     except OSError:
         return False
-    return head.startswith("---") and ('\ntweet_id: "' in head or app.STATUS_TAG in head)
+    return head.startswith("---") and '\ntweet_id: "' in head
 
 
 def _foreign(p: Path) -> list[str]:
-    """Files and folders below work/ and tuning/ that scatha can't show are its own (a vault, a note, a document)."""
+    """Files below work/ and tuning/ that aren't at a path scatha writes (a vault, a note, a document)."""
     out = []
     for top in (p / "work", p / "tuning"):
         for root, dirs, files in os.walk(top):
             here = Path(root)
             for d in [d for d in dirs if d == ".obsidian"]:
-                out.append(str((here / d).relative_to(p)))
+                out.append((here / d).relative_to(p).as_posix())
                 dirs.remove(d)
             for f in files:
-                path = here / f
-                suffix = path.suffix if path.suffix else path.name  # .seen and .last-success are whole names
-                if suffix not in OURS_INSIDE or (suffix == ".md" and not _ours_md(path)):
-                    out.append(str(path.relative_to(p)))
+                rel = (here / f).relative_to(p).as_posix()
+                if any(o.fullmatch(rel) for o in OWNED):
+                    continue
+                if PREVIEW_NOTES.fullmatch(rel) and _preview_note(here / f):
+                    continue
+                out.append(rel)
     return sorted(out)
 
 
@@ -346,7 +362,7 @@ def _main(argv: list[str] | None, ui, done: list[str]) -> int:
     chosen, bad = pick(items, answer)
     for tok in bad:
         ui.bad(f"'{tok}' isn't on the list, or isn't offered.")
-    if bad and not tty:
+    if bad and (args.remove or not tty):  # picks given on the command line: a refused one is an error, terminal or not
         return 2
     if not chosen:
         ui.say("  Nothing removed.")
