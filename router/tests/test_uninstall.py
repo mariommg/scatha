@@ -88,7 +88,7 @@ def test_data_folder_checks(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path / "me"))
     f = tmp_path / "f"
     f.mkdir()
-    assert "no scatha config" in uninstall.data_folder_problem(f)
+    assert "no Scatha config" in uninstall.data_folder_problem(f)
     (f / "config.json").write_text("{}")
     assert uninstall.data_folder_problem(f) is None
     (f / "thesis.docx").write_text("x")
@@ -131,7 +131,7 @@ def test_stopping_says_truly_what_was_removed(world, monkeypatch, capsys):
     assert "Removed before that: The schedule" in capsys.readouterr().out
     monkeypatch.setattr(uninstall.sys.stdin, "isatty", lambda: True)
     monkeypatch.setattr("builtins.input", lambda prompt="": (_ for _ in ()).throw(EOFError))
-    assert uninstall.main([]) == 130 and "Nothing removed" in capsys.readouterr().out
+    assert uninstall.main([]) == 130 and "removed nothing" in capsys.readouterr().out
 
 
 def test_one_stuck_item_does_not_stop_the_rest(world, monkeypatch):

@@ -269,7 +269,7 @@ Each item says what it's for and what else removing it touches. For example, `AU
 
 - **Before deleting the data folder,** it offers to keep a copy of your topics, settings, and desk answers.
 - **Your notes are listed but never offered.** They're plain Markdown, and they work without Scatha.
-- **A wrong `SCATHA_HOME` can't take a vault with it.** Uninstall refuses to delete a data folder that holds anything Scatha didn't put there.
+- **A wrong `SCATHA_HOME` can't take a vault with it.** Uninstall refuses to delete a data folder that holds anything Scatha didn't put there. It also refuses when it finds a file it can't be sure it made, even one of its own it doesn't recognize yet. Then the folder stays, the list shows the files it found, and you can delete the folder by hand once you've checked nothing in it is yours.
 
 **What uninstalling can't do for you:**
 
