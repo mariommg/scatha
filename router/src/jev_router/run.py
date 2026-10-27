@@ -69,6 +69,7 @@ def smaug_env(cfg: dict) -> dict:
 
 
 LOCK_STALE = dt.timedelta(hours=6)
+UNSORTED = ("skip", "review")  # routing statuses that end in Unsorted rather than a topic folder
 
 
 def take_lock(lock) -> str | None:
@@ -220,8 +221,10 @@ def main(argv: list[str] | None = None) -> int:
             pending=str(pending), routes=str(run_dir / "routes.json"), taxonomy=str(tax_path),
             out=str(w / "notes-preview"), ids=None, to_vault=not args.preview))
 
-        # 5b. Bookmarks that fit no topic: light notes in Unsorted (no model cost), unless turned off
-        skips = [r for r in results if r.status == "skip"]
+        # 5b. Bookmarks that fit no topic: light notes in Unsorted (no model cost), unless turned off.
+        # "review" (between the two thresholds, when someone sets them apart) has no queue of its own,
+        # so it goes to Unsorted too and is ledgered as a skip: the desk and discovery see it there.
+        skips = [r for r in results if r.status in UNSORTED]
         if skips and unsorted.mode(cfg) != "off":
             where = unsorted.folder(cfg, tax)
             if args.preview:
@@ -233,9 +236,9 @@ def main(argv: list[str] | None = None) -> int:
         if not args.preview:
             done = {i for i, _, _ in summary["written"]} | set(summary["present"])
             today = dt.date.today().isoformat()
-            append_ledger([f"- {bookmarks[r.item_id]['tweetUrl']} | {today} | {r.status} | {r.primary}"
+            append_ledger([f"- {bookmarks[r.item_id]['tweetUrl']} | {today} | {'skip' if r.status in UNSORTED else r.status} | {r.primary}"
                            for r in results
-                           if r.status == "skip" or (r.status == "route" and r.item_id in done)])
+                           if r.status in UNSORTED or (r.status == "route" and r.item_id in done)])
             last_ok.touch()
         shutil.move(str(pending), run_dir / "pending-bookmarks.json")
 
