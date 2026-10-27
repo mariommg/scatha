@@ -35,57 +35,102 @@ From there, it's your call:
 
 ## What you need
 
-- **Node.js 22+** ([nodejs.org](https://nodejs.org/), the LTS version) and **[uv](https://docs.astral.sh/uv/getting-started/installation/)** (a Python tool manager; one command installs it)
 - **An X account** you're logged in to in a browser. One account per computer for now; support for several is on the roadmap but not built yet.
 - **A TypeSafe API key** for Jev ([typesafe.ai](https://typesafe.ai)). A few cents covers hundreds of bookmarks.
 - **Claude Code**, logged in (uses your Claude plan), *or* an **Anthropic API key** (pay as you go). Coming soon: ChatGPT support.
 - **Obsidian** if you want notes in a vault (optional; the notes are plain Markdown, so they're pretty versatile)
+- **Two free tools**, Node.js and uv. The steps below show you how to install them.
 
-## Getting started
+## Getting started on Windows
 
-New to GitHub? No problem. You don't need an account, and you won't touch any code.
+Scatha doesn't come with an installer you can double-click. Instead, you'll copy a few lines into a window and answer some questions. It takes about 20 minutes, and these steps cover every click. (On a Mac or Linux? Skip to [macOS and Linux](#getting-started-on-macos-or-linux).)
 
-### 1. Download Scatha
+You don't need a GitHub account, and you won't need to touch any code.
 
-1. Near the top of this page, click the green **Code** button, then **Download ZIP**.
-2. Unzip it somewhere it can stay, like your Documents folder.
+### Step 1: Install the tools
+
+Install these three, in this order.
+
+1. **Node.js.** Go to [nodejs.org](https://nodejs.org/) and click the button for the **LTS** version. Open the file you downloaded and click through the installer. The default choices are fine.
+2. **uv.** Click **Start**, type `PowerShell`, and open **Windows PowerShell**. Copy this line, paste it into the PowerShell window (**Ctrl+V**), and press **Enter**:
+
+   ```powershell
+   powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+   ```
+
+   When it says it's done, close the PowerShell window. Windows only sees a newly installed tool in windows you open *after* installing it.
+3. **Claude Code.** Install it by following the Windows steps at [claude.com/claude-code](https://claude.com/claude-code). Then open a *new* PowerShell window, type `claude`, press **Enter**, and log in with your Claude account. Close the window when you're done.
+
+While you're at it, get your **TypeSafe API key** from [typesafe.ai](https://typesafe.ai), and make sure you're **logged in to X** in your browser. Setup asks for both.
+
+### Step 2: Download Scatha
+
+1. Near the top of this page, click the green **Code** button, then click **Download ZIP**. Your browser saves a file called `scatha-master.zip` in your **Downloads** folder.
+2. Open your **Downloads** folder in File Explorer. Right-click `scatha-master.zip` and choose **Extract All...**
+3. In the window that opens, click **Browse...**, click **Documents**, and click **Select Folder**. Then click **Extract**.
+
+You now have a folder called `scatha-master` in your **Documents** folder. This is the **Scatha folder**. The rest of these steps happen inside it.
 
 > [!IMPORTANT]
-> **Pick a permanent home for the Scatha folder.** That folder *is* the program, and the schedule runs Scatha from there. If you move or delete it later, the schedule stops working. (To fix it, run `setup schedule` from the new spot.) This goes for the Scatha folder only: the setup file you'll make in step 4 can stay in Downloads.
+> **Leave the Scatha folder where it is.** The Scatha folder *is* the program. Every scheduled run starts from it. If you move, rename, or delete the Scatha folder later, the schedule stops working. (If you do move it, open PowerShell in its new spot, as in Step 3, and run `powershell -ExecutionPolicy Bypass -File setup.ps1 schedule`.)
+>
+> This only goes for the Scatha folder. The ZIP file, and the setup file you'll make in Step 4, can stay in Downloads or go in the trash.
 
-Comfortable with git? `git clone https://github.com/mariommg/scatha.git` does the same thing, and `git pull` gets you updates later.
+Comfortable with git? `git clone https://github.com/mariommg/scatha.git` into a folder you'll keep does the same thing, and `git pull` gets you updates later.
 
-### 2. Install the tools
+### Step 3: Open PowerShell in the Scatha folder
 
-Install everything under [What you need](#what-you-need). After installing uv, close and reopen your terminal so it can find it.
+1. In File Explorer, open **Documents**, then double-click the **scatha-master** folder. You should see files like `README.md` and `setup.ps1`.
+2. Right-click an empty spot in that folder (not on a file) and choose **Open in Terminal**. On Windows 10, hold **Shift** while you right-click, and choose **Open PowerShell window here**.
+3. A window opens. Its last line should end with `scatha-master>`. That's how you know you're in the right place.
 
-### 3. Open a terminal in the Scatha folder
+Keep this window open for Step 5.
 
-- **Windows:** open the folder in File Explorer, right-click an empty spot, and choose **Open in Terminal**.
-- **macOS:** in Finder, right-click the folder and choose **Services → New Terminal at Folder**.
-- **Linux:** you know the drill.
+### Step 4: Plan your topics (optional, but it helps)
 
-### 4. Plan, then run setup
+1. In the Scatha folder, open the **docs** folder and double-click **onboarding.html**. It opens in your browser.
+2. Work through the page: your topics, where their notes go, and when Scatha runs.
+3. At the end, click **Download my-setup.json**. Your browser saves it in your **Downloads** folder. Leave it there; setup reads it once, and you can delete it afterward.
 
-From the Scatha folder, open `docs/onboarding.html` in your browser (double-click it) and plan your topics, folders, and schedule. When you're done, it downloads a small file called `my-setup.json` with your answers (no secrets in it, on purpose).
+Rather answer the questions in setup itself? Skip this step.
 
-Leave that file in your Downloads folder. Setup reads it once, and you can delete it afterward. Then run setup, pointed at it:
+### Step 5: Run setup
+
+Go back to the PowerShell window from Step 3. Copy **one** of these lines, paste it in, and press **Enter**.
+
+If you made `my-setup.json` in Step 4:
 
 ```powershell
-# Windows
 powershell -ExecutionPolicy Bypass -File setup.ps1 --answers $HOME\Downloads\my-setup.json
 ```
 
-```bash
-# macOS / Linux
-./setup.sh --answers ~/Downloads/my-setup.json
+If you skipped Step 4:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File setup.ps1
 ```
 
-... and follow the prompts. (Does your browser save downloads somewhere else? Change the path to match.)
+(Does your browser save downloads somewhere other than **Downloads**? Change that part of the first line to match.)
 
-Or skip the planner and run `setup.ps1` / `./setup.sh` with no arguments. The wizard asks everything itself.
+Setup asks one question at a time. Press **Enter** to accept the answer shown in [brackets]. Along the way, it:
 
-The wizard checks your tools and asks for your X cookies and API keys in hidden prompts. It confirms each one actually works, finds your Obsidian vaults, and installs the schedule. Then it offers a test drive on your five newest bookmarks, into a preview folder, so nothing lands in your vault until you've seen it. Last, it offers to install the `scatha` command.
+- checks the tools from Step 1,
+- shows you how to copy your X login from your browser, and asks for it and your TypeSafe key (what you paste stays hidden), then checks that each one works,
+- finds your Obsidian vaults and asks where each topic's notes go,
+- sets up the schedule,
+- and offers a test run on your five newest bookmarks. Those notes go to a preview folder, so you can look them over before anything lands in your vault.
+
+At the end, setup offers to install the `scatha` command. Say yes. Then close PowerShell, open a new PowerShell window (from anywhere), and type `scatha`. It shows you what happened.
+
+Stopped partway? Run the same line again. Setup remembers your answers and picks up where you left off.
+
+## Getting started on macOS or Linux
+
+1. Install [Node.js](https://nodejs.org/) 22 or newer, [uv](https://docs.astral.sh/uv/getting-started/installation/), and [Claude Code](https://claude.com/claude-code). Run `claude` once and log in.
+2. Download Scatha (the green **Code** button, then **Download ZIP**, or `git clone https://github.com/mariommg/scatha.git`). Unzip it somewhere permanent: the folder *is* the program, and the schedule runs it from there.
+3. Open a terminal in the Scatha folder. (macOS: in Finder, right-click the folder and choose **Services → New Terminal at Folder**.)
+4. Optional: plan your topics in `docs/onboarding.html`, which saves `my-setup.json` to your Downloads folder.
+5. Run `./setup.sh --answers ~/Downloads/my-setup.json`, or `./setup.sh` if you skipped the planner, and follow the prompts.
 
 ## Day to day
 
