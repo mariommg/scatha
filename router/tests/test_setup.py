@@ -435,7 +435,7 @@ def test_a_failed_npm_install_fails_step_1(home, smaug, monkeypatch, capsys):
     installed(smaug, "dayjs")  # half-finished: one package in, so node_modules exists
     monkeypatch.setattr(onboard.subprocess, "run", lambda *a, **k: SimpleNamespace(returncode=1))
     assert onboard.step_prereqs(app.load_config()) is False
-    assert "Couldn't install Smaug's packages" in capsys.readouterr().out
+    assert "couldn't install Smaug's packages" in capsys.readouterr().out
 
 
 def test_missing_packages_are_named_not_blamed_on_x(home, smaug, monkeypatch):

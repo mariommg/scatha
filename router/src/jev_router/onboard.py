@@ -34,6 +34,7 @@ from pathlib import Path
 
 from . import app, checks, scheduler, topics, vaults
 from .checks import verify_notes, verify_typesafe, verify_x
+from .report import _n
 from .uninstall import TOOL
 
 # ---------- output ----------
@@ -120,7 +121,7 @@ def ask(prompt: str, default: str | None = None, clearable: bool = False) -> str
             return ""
         if v or default is not None or clearable:  # an optional question: Enter with nothing means none
             return v
-        say(dim("  (I need an answer here.)"))
+        say(dim("  (Type an answer, then press Enter.)"))
 
 
 def yes(prompt: str, default: bool = True) -> bool:
@@ -136,7 +137,7 @@ def choose(prompt: str, options: list[str], default: int = 1) -> int:
         v = input(f"  Number {dim(f'[{default}]')}: ").strip() or str(default)
         if v.isdigit() and 1 <= int(v) <= len(options):
             return int(v)
-        say(dim(f"  (Pick a number from 1 to {len(options)}.)"))
+        say(dim(f"  (Type a number from 1 to {len(options)}.)"))
 
 
 def read_hidden(prompt: str, getch, write) -> str:
@@ -194,14 +195,15 @@ def hidden_input(prompt: str) -> str:
 
 def secret(prompt: str) -> str:
     while True:
-        v = hidden_input(f"  {prompt} (hidden; paste, then Enter): ").strip()
+        v = hidden_input(f"  {prompt} (hidden: paste it, then press Enter): ").strip()
         half = len(v) // 2
         if v and len(v) % 2 == 0 and v[:half] == v[half:]:
-            say(dim(f"  (That looks like the same thing pasted twice; using it once: {half} characters.)"))
+            say(dim(f"  (That looks like the same text pasted twice. {app.DISPLAY_NAME} will use it once: "
+                    f"{half} characters.)"))
             v = v[:half]
         if v:
             return v
-        say(dim("  (Nothing came through. Paste it and press Enter.)"))
+        say(dim("  (Nothing came through. Paste it, then press Enter.)"))
 
 
 # ---------- checks ----------
@@ -226,25 +228,28 @@ def step_prereqs(cfg: dict) -> bool:
     ok_ = True
     node = which("node")
     if not node or node_major(node) < 22:
-        bad("Node.js 22 or newer is needed (it runs Smaug). Get it at https://nodejs.org, then run setup again.")
+        bad(f"{app.DISPLAY_NAME} needs Node.js 22 or newer (it runs Smaug). Get it at https://nodejs.org. "
+            "Then run setup again.")
         ok_ = False
     else:
         cfg["tools"]["node"] = node
         ok(f"Node.js {node_major(node)}")
     smaug = app.REPO / "smaug"
     if ok_ and checks.smaug_missing():
-        hint("… installing Smaug's packages (one time)")
+        hint("… installing Smaug's packages (this happens one time only)")
         proc = subprocess.run([which("npm") or "npm", "install", "--silent"], cwd=smaug, check=False)
         if proc.returncode != 0 or checks.smaug_missing():
-            bad("Couldn't install Smaug's packages (npm install failed). Check your internet connection,")
-            say("    then run setup again. To see npm's error, type `npm install` in the smaug folder.")
+            bad(f"{app.DISPLAY_NAME} couldn't install Smaug's packages (npm install failed).")
+            say("    Check your internet connection, then run setup again.")
+            say(f"    To see npm's error, open a terminal in {smaug} and type `npm install`.")
             ok_ = False
     bird = which("bird")
     if not bird and ok_:
         say()
-        say("  Optional: bird, a command-line X tool, as a backup. Smaug reads X with its own copy of")
-        say("  bird's code; if that ever fails, an installed bird is tried instead. bird 0.8.0 is the")
-        say("  last release (its author stopped maintaining it), so it's a backup, not a fix.")
+        say("  Optional: bird, a command-line X tool, as a backup.")
+        say(f"  Smaug reads X with its own copy of bird's code. If that copy ever fails, {app.DISPLAY_NAME} will")
+        say("  try an installed bird instead. bird 0.8.0 is the last release (its author stopped work on it),")
+        say("  so it won't help if X changes how it works.")
         if yes("Install bird 0.8.0 with npm as a backup?", default=False):
             subprocess.run([which("npm") or "npm", "install", "-g", "@steipete/bird@0.8.0"], check=False)
             bird = which("bird")
@@ -255,22 +260,24 @@ def step_prereqs(cfg: dict) -> bool:
 
 
 def step_x(cfg: dict, verify: bool = True) -> bool:
-    say("  Your bookmarks come from X through your browser session. Two cookies do it:")
+    say(f"  {app.DISPLAY_NAME} reads your bookmarks through your X login in the browser. It needs two cookies:")
     say()
-    say("    1. In your browser, open x.com (logged in).")
-    say("    2. Open developer tools (F12) → Application (Storage in Firefox) → Cookies → https://x.com")
-    say("    3. Copy the values of auth_token and ct0.")
+    say("    1. In your browser, open x.com and log in.")
+    say("    2. Press F12 to open the developer tools.")
+    say("    3. Go to Application (Storage in Firefox) → Cookies → https://x.com")
+    say("    4. Find the rows named auth_token and ct0. You will paste each row's Value below.")
     say()
-    hint("They're the keys to your X session, so treat them like a password. They stop working")
-    hint(f"when you log out of X; when that happens, run:  {setup_cmd('x-login')}")
+    hint("Treat these cookies like a password: they unlock your X account.")
+    hint(f"They stop working when you log out of X. If that happens, type:  {setup_cmd('x-login')}")
     if verify and (missing := checks.smaug_missing()):
-        bad(f"Smaug's packages aren't all installed ({', '.join(missing)}), so X can't be checked yet.")
-        say(f"    Run {setup_cmd()} and fix step 1 first.")
+        bad(f"Smaug's packages aren't all installed ({', '.join(missing)}), so {app.DISPLAY_NAME} "
+            "can't check your X login yet.")
+        say(f"    Type {setup_cmd()} and fix step 1 first.")
         return False
     handle = verify_x(cfg) if verify and app.has_secret("AUTH_TOKEN") else None
     if handle:
         say()
-        if not yes(f"Saved cookies still work (X sees {handle}). Replace them?", default=False):
+        if not yes(f"Your saved cookies still work (X sees you as {handle}). Replace them?", default=False):
             ok("Keeping the saved cookies.")
             return True
     for attempt in range(3):
@@ -285,13 +292,13 @@ def step_x(cfg: dict, verify: bool = True) -> bool:
             os.environ["AUTH_TOKEN"], os.environ["CT0"] = token, ct0
             ok(f"X sees you as {handle}. Saved to {where}.")
             return True
-        bad("X didn't accept those. Double-check you copied the values, not the names, and try again.")
+        bad("X didn't accept those. Make sure you copied each Value, not its name.")
     return False
 
 
 def step_typesafe(verify: bool = True) -> bool:
-    say("  Jev (from TypeSafe) sorts each bookmark into your topics. It's cheap: a few cents covers")
-    say("  hundreds of bookmarks. Get an API key at https://typesafe.ai (dashboard → API keys).")
+    say("  Jev (from TypeSafe) sorts each bookmark into your topics. A few cents covers hundreds of bookmarks.")
+    say("  Get an API key at https://typesafe.ai (dashboard → API keys).")
     say()
     if app.has_secret(app.SECRETS["typesafe"]) and verify and not verify_typesafe():
         if not yes("A working TypeSafe key is already saved. Replace it?", default=False):
@@ -303,23 +310,26 @@ def step_typesafe(verify: bool = True) -> bool:
         if not err:
             ok(f"Jev answered. Saved to {app.save_secret(app.SECRETS['typesafe'], key)}.")
             return True
-        bad(f"That key didn't work ({err[:120]}). Try again?")
+        bad(f"That key didn't work. (TypeSafe said: {err[:120]})")
     return False
 
 
 def step_notes(cfg: dict, preset: str | None = None, verify: bool = True) -> bool:
-    say("  Claude Haiku writes each note: summary, key points, quotes, translation, reading images.")
+    say("  Claude Haiku writes each note: the summary, key points, quotes, a translation if needed,")
+    say("  and the text in images.")
     claude = which("claude")
-    options = ["Claude Code, headless " + dim("(uses your Claude plan; no API key needed)"),
-               "Anthropic API key " + dim("(pay as you go, roughly a cent per note)")]
+    options = ["Claude Code, headless  " + dim(f"({app.DISPLAY_NAME} starts it in the background; uses your "
+                                                "Claude plan, no API key needed)"),
+               "Anthropic API Key  " + dim("(pay as you go, about a cent per note)")]
     if preset:
         pick = 1 if preset == "claude-code" else 2
     else:
-        pick = choose("How should Haiku be reached?", options, default=1 if claude else 2)
+        pick = choose(f"How should {app.DISPLAY_NAME} reach Haiku?", options, default=1 if claude else 2)
     if pick == 1:
         if not claude:
-            bad("I can't find the 'claude' command. Install Claude Code (https://claude.com/claude-code),")
-            say("    log in once by running 'claude', then run setup again. Or pick the API option.")
+            bad(f"{app.DISPLAY_NAME} can't find the 'claude' command.")
+            say("    Install Claude Code (https://claude.com/claude-code). Then open a terminal, type 'claude',")
+            say(f"    and log in. Then run setup again. Or pick {bold('Anthropic API Key')} instead.")
             return False
         cfg["notes_backend"], cfg["tools"]["claude"] = "claude-code", claude
     else:
@@ -328,7 +338,8 @@ def step_notes(cfg: dict, preset: str | None = None, verify: bool = True) -> boo
     while err := verify_notes(cfg) if verify else None:
         bad(f"Haiku didn't answer: {checks.notes_error_in_words(err, cfg['notes_backend'])}")
         # Usually fixable without leaving: log in again in another terminal, then retry here
-        if not yes("Fixed it in another terminal? Try again", default=True):
+        hint("You can fix this in another terminal, then try again here.")
+        if not yes("Try again?", default=True):
             return False
     ok("Haiku answered.")
     return True
@@ -367,8 +378,8 @@ def step_api_key(cfg: dict, verify: bool = True) -> bool:
 def pick_topics() -> list[dict]:
     names = list(topics.PRESETS)
     question("Which topics do you want?")
-    hint("A bookmark goes to the topic it fits best; one that fits none of them is skipped.")
-    hint("Start from these (the first five are tuned); you can add your own next.")
+    hint("Each bookmark goes to the topic it fits best. A bookmark that fits none of them goes to Unsorted.")
+    hint("Pick from this list. (The first five are tuned to work well.) You can add your own after this.")
     say()
     for i, n in enumerate(names, 1):
         say(f"    {i:>2}  {n}")
@@ -378,7 +389,7 @@ def pick_topics() -> list[dict]:
             "preset": True} for n in chosen]
     say()
     while yes("Add a topic of your own?", default=not out):
-        label = ask("Name (short, like 'Sports')")
+        label = ask("Topic name (short, like 'Sports')")
         desc = ask("In one line, what belongs here?")
         out.append({"label": label, "description": desc})
         say()
@@ -400,18 +411,18 @@ def split_destination(dest: Path, found: list[Path]) -> tuple[str, str]:
 
 def vault_options(found: list[Path]) -> list[str]:
     width = max((len(v.name) for v in found), default=0)
-    return [f"{v.name.ljust(width)}  {dim(str(v))}" for v in found] + ["Another folder (type a path)"]
+    return [f"{v.name.ljust(width)}  {dim(str(v))}" for v in found] + ["Another Folder  (type its full path)"]
 
 
 def pick_base(found: list[Path], prompt: str, current: Path | None = None) -> Path:
     """A vault from the list, or any folder."""
     if not found:
-        return Path(ask("Folder path", default=str(current) if current else None)).expanduser()
+        return Path(ask("Full folder path", default=str(current) if current else None)).expanduser()
     cur = vault_of(current, found) if current else None
     pick = choose(prompt, vault_options(found), default=found.index(cur) + 1 if cur else 1)
     if pick <= len(found):
         return found[pick - 1]
-    return Path(ask("Folder path", default=str(current.parent) if current and not cur else None)).expanduser()
+    return Path(ask("Full folder path", default=str(current.parent) if current and not cur else None)).expanduser()
 
 
 def folder_name(label: str) -> str:
@@ -442,12 +453,13 @@ def review_destinations(ts: list[dict], found: list[Path]) -> None:
             marks.append("" if dest.is_dir() else "(new)")
         table(["#", "Topic", "Vault or folder", "Subfolder"], rows, marks)
         if any(marks):
-            hint("(new) folders don't exist yet; they're made when the first note lands. Check the spelling.")
-        v = input(f"  Enter to save, or a number to change one: ").strip()
+            hint(f"(new) means the folder doesn't exist yet. {app.DISPLAY_NAME} will make it when the first note "
+                 "lands, so check the spelling now.")
+        v = input(f"  Press Enter to save, or type a row's number to change it: ").strip()
         if not v:
             return
         if not (v.isdigit() and 1 <= int(v) <= len(ts)):
-            say(dim(f"  (Press Enter, or pick a number from 1 to {len(ts)}.)"))
+            say(dim(f"  (Press Enter, or type a number from 1 to {len(ts)}.)"))
             continue
         t = ts[int(v) - 1]
         current = Path(t["destination"])
@@ -459,13 +471,13 @@ def step_topics(cfg: dict, preset_topics: list[dict] | None = None, draft: bool 
     if preset_topics is None:
         preset_topics = pick_topics()
         if not preset_topics:
-            bad("You need at least one topic.")
+            bad(f"{app.DISPLAY_NAME} needs at least one topic.")
             return False
 
     needs_definition = [t for t in preset_topics if "question" not in topics.PRESETS.get(t["label"], {})]
     if draft is None:
         draft = bool(needs_definition) and yes(
-            "Have Haiku turn your one-liners into definitions Jev reads well? (recommended)")
+            "Have Haiku turn your one-line descriptions into definitions Jev can use? (Recommended.)")
 
     # Destinations: one place for all, each topic in its own subfolder, then a review where any row can change.
     found = vaults.find_vaults()
@@ -475,7 +487,7 @@ def step_topics(cfg: dict, preset_topics: list[dict] | None = None, draft: bool 
     if any(not t.get("destination") for t in preset_topics):
         if not found:
             question("Where should your notes go?")
-            hint("No Obsidian vaults found; notes are plain Markdown, so any folder works.")
+            hint(f"{app.DISPLAY_NAME} found no Obsidian vaults. Notes are plain Markdown files, so any folder works.")
             base = pick_base(found, "")
         else:
             base = pick_base(found, "Which Obsidian vault should your notes go to?")
@@ -500,8 +512,8 @@ def step_topics(cfg: dict, preset_topics: list[dict] | None = None, draft: bool 
             d = topics.template_definition(t["label"], t["description"])
         built.append({"label": t["label"], **d, "destination": t["destination"]})
     path = topics.write_taxonomy(built, app.taxonomy_path(cfg))
-    ok(f"{len(built)} topics saved to {path}")
-    hint("Plain YAML. Open it any time to adjust wording or folders.")
+    ok(f"Saved {_n(len(built), 'topic')} to {path}")
+    hint("It's a plain text file (YAML). You can open it any time to change the wording or the folders.")
     step_unsorted(cfg, [Path(t["destination"]) for t in built])
     return True
 
@@ -514,10 +526,10 @@ def step_unsorted(cfg: dict, destinations: list[Path], preset: str | None = None
     current = (cfg.get("unsorted") or {}).get("folder") or suggested
     say()
     question("Bookmarks that fit none of your topics")
-    hint("They go to an Unsorted folder as light notes: the post and its links, no summary, no model cost. Nothing")
-    hint(f"disappears, and you can sort them later with `{app.command('review')}`. Any folder works, in any vault.")
-    hint("Type - to keep no notes for them (they're only listed in the ledger).")
-    choice = preset if preset is not None else ask("Folder for them", current, clearable=True)
+    hint("They go to an Unsorted folder as light notes: the post and its links, with no summary and no model cost.")
+    hint(f"Nothing gets lost. You can sort them later with `{app.command('review')}`. Any folder works, in any vault.")
+    hint(f"To skip notes for them, type -. ({app.DISPLAY_NAME} will still list them in its ledger.)")
+    choice = preset if preset is not None else ask("Unsorted folder", current, clearable=True)
     cfg["unsorted"] = {"mode": "light", "folder": str(Path(choice).expanduser())} if choice else {"mode": "off", "folder": ""}
     app.save_config(cfg)
     ok(f"Unsorted: {cfg['unsorted']['folder']}" if choice else "Unsorted: off (ledger only)")
