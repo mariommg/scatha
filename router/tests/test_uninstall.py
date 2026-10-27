@@ -139,3 +139,51 @@ def test_one_stuck_item_does_not_stop_the_rest(world, monkeypatch):
     monkeypatch.setattr(scheduler, "remove", stuck)
     assert uninstall.main(["--remove", "schedule,typesafe_api_key", "--yes"]) == 1
     assert world["env"] == {"AUTH_TOKEN": "a"}
+
+
+# 2026-10-27 pre-release review, finding 3: a vault or a personal note inside work/ went with the data folder.
+
+def test_a_vault_or_note_inside_the_data_folder_stops_its_deletion(world):
+    nested = world["data"] / "work" / "PersonalVault"
+    (nested / ".obsidian").mkdir(parents=True)
+    (nested / "Thesis.md").write_text("my thesis")
+    assert "PersonalVault" in uninstall.data_folder_problem(world["data"], app.load_config())
+    uninstall.main(["--remove", "data", "--yes", "--no-copy"])  # the review's CLI run: it deleted the vault
+    assert (nested / "Thesis.md").read_text() == "my thesis"
+    data = next(it for it in uninstall.inventory(app.load_config()) if it.key == "data")
+    assert data.remove is None and "Not offered" in data.note
+
+
+@pytest.mark.parametrize("name", ["Thesis.md", "draft.txt", "photo.png"])
+def test_a_personal_file_anywhere_below_stops_it(world, name):
+    f = world["data"] / "tuning" / "mine" / name
+    f.parent.mkdir()
+    f.write_text("mine")
+    assert name in uninstall.data_folder_problem(world["data"], app.load_config())
+
+
+def test_notes_written_inside_the_data_folder_stop_it(world):
+    cfg = app.load_config()
+    cfg["status_note"] = str(world["data"] / "work" / "scatha.md")
+    assert "your notes are written inside it" in uninstall.data_folder_problem(world["data"], cfg)
+
+
+def test_what_scatha_writes_there_is_still_deletable(world):
+    w = world["data"] / "work"
+    (w / "runs" / "2026-10-24_0001" / "notes-preview" / "AI").mkdir(parents=True)
+    (w / "runs" / "2026-10-24_0001" / "notes-preview" / "AI" / "a.md").write_text('---\ntweet_id: "1"\n---\n')
+    (w / "runs" / "2026-10-24_0001" / "routes.md").write_text("| id |")
+    (w / "runs" / "2026-10-24_0001" / "routes.json").write_text("[]")
+    (w / "logs").mkdir()
+    (w / "logs" / "2026-10-24_0001.log").write_text("ok")
+    (w / "runs.jsonl").write_text("")
+    (w / ".seen").write_text("")
+    (w / ".last-success").write_text("")
+    assert uninstall.data_folder_problem(world["data"], app.load_config()) is None
+
+
+def test_deleting_checks_again_at_the_last_moment(world):
+    go = next(it for it in uninstall.inventory(app.load_config()) if it.key == "data").remove
+    late = world["data"] / "work" / "Late.md"
+    late.write_text("written after the list was shown")
+    assert "Didn't delete" in go() and late.exists()

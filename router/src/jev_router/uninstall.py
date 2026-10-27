@@ -12,6 +12,7 @@ say how. So do the things no local step can undo: an X login, a TypeSafe key.
 from __future__ import annotations
 
 import datetime as dt
+import os
 import shutil
 import subprocess
 import sys
@@ -48,8 +49,62 @@ class Item:
     note: str = ""      # for listed-only items: why it isn't offered, or how to do it by hand
 
 
-def data_folder_problem(path: Path) -> str | None:
-    """Why this folder must not be deleted as scatha's data folder, or None."""
+# What scatha writes below work/ and tuning/: these kinds of file, and Markdown only of its own (see _ours_md).
+OURS_INSIDE = {".json", ".jsonl", ".md", ".log", ".yaml", ".seen", ".last-success", ".lock"}
+OURS_MD = {"ingested.md", "routes.md"}  # the ledger and a routing table; every other note carries a tweet_id
+
+
+def _ours_md(path: Path) -> bool:
+    if path.name in OURS_MD:
+        return True
+    try:
+        head = path.read_text(encoding="utf-8", errors="ignore")[:2000]
+    except OSError:
+        return False
+    return head.startswith("---") and ('\ntweet_id: "' in head or app.STATUS_TAG in head)
+
+
+def _foreign(p: Path) -> list[str]:
+    """Files and folders below work/ and tuning/ that scatha can't show are its own (a vault, a note, a document)."""
+    out = []
+    for top in (p / "work", p / "tuning"):
+        for root, dirs, files in os.walk(top):
+            here = Path(root)
+            for d in [d for d in dirs if d == ".obsidian"]:
+                out.append(str((here / d).relative_to(p)))
+                dirs.remove(d)
+            for f in files:
+                path = here / f
+                suffix = path.suffix if path.suffix else path.name  # .seen and .last-success are whole names
+                if suffix not in OURS_INSIDE or (suffix == ".md" and not _ours_md(path)):
+                    out.append(str(path.relative_to(p)))
+    return sorted(out)
+
+
+def _inside(child: Path, parent: Path) -> bool:
+    try:
+        return child.resolve().is_relative_to(parent)
+    except OSError:
+        return False
+
+
+def note_folders(cfg: dict) -> list[Path]:
+    """Every folder scatha writes notes into, and the status note."""
+    tax = _taxonomy(cfg)
+    if tax is None:
+        return []
+    from . import report, unsorted
+    out = [Path(t.destination).expanduser() for t in tax.topics if t.destination]
+    if unsorted.mode(cfg) != "off":
+        out.append(unsorted.folder(cfg, tax))
+    return out + [report.note_path(cfg, tax)]
+
+
+def data_folder_problem(path: Path, cfg: dict | None = None) -> str | None:
+    """Why this folder must not be deleted as scatha's data folder, or None.
+
+    Its top level must hold only what scatha writes there, and below that only scatha's own
+    kinds of file: a vault, a note folder, or a personal file anywhere inside stops it."""
     if not path.is_dir():
         return "it isn't there"
     p = path.resolve()
@@ -62,6 +117,12 @@ def data_folder_problem(path: Path) -> str | None:
     extra = sorted(c.name for c in p.iterdir() if c.name not in OURS)
     if extra:
         return "it holds things scatha didn't put there: " + ", ".join(extra[:5]) + (" ..." if len(extra) > 5 else "")
+    inside = [str(f) for f in note_folders(cfg or {}) if _inside(f, p)] if cfg else []
+    if inside:
+        return "your notes are written inside it: " + ", ".join(inside[:3]) + (" ..." if len(inside) > 3 else "")
+    foreign = _foreign(p)
+    if foreign:
+        return "it holds things scatha didn't write: " + ", ".join(foreign[:5]) + (" ..." if len(foreign) > 5 else "")
     return None
 
 
@@ -71,14 +132,6 @@ def _taxonomy(cfg: dict):
         return Taxonomy.load(app.taxonomy_path(cfg))
     except Exception:  # half-finished setup: no topics yet
         return None
-
-
-def _scatha_note(path: Path) -> bool:
-    """A status note scatha wrote (it tags its own), not a note the user named the same."""
-    try:
-        return path.is_file() and "tags: [scatha]" in path.read_text(encoding="utf-8")[:200]
-    except OSError:
-        return False
 
 
 def _remove_tool() -> str:
@@ -99,6 +152,17 @@ def _rmtree(path: Path, done: str) -> Callable[[], str]:
     def go() -> str:
         shutil.rmtree(path)
         return done
+    return go
+
+
+def _remove_data(home: Path, cfg: dict) -> Callable[[], str]:
+    """Checks the data folder again right before deleting it: something may have landed there since the list."""
+    def go() -> str:
+        problem = data_folder_problem(home, cfg)
+        if problem:
+            return f"Didn't delete {home}: {problem}."
+        shutil.rmtree(home)
+        return f"Deleted {home}."
     return go
 
 
@@ -139,7 +203,7 @@ def inventory(cfg: dict) -> list[Item]:
                           "That install stops importing. Its data folder stays (delete it by hand if you're done with it).",
                           lambda t=task: scheduler.remove(t)))
 
-    problem = data_folder_problem(home)
+    problem = data_folder_problem(home, cfg)
     if home.exists():
         what = f"The data folder: {home}"
         why = ("Your settings and topics, the record of what's been imported, your answers on the desk, "
@@ -148,7 +212,7 @@ def inventory(cfg: dict) -> list[Item]:
         if problem:
             items.append(Item("data", what, why, splash, note=f"Not offered: {problem}. Delete it by hand if you're sure."))
         else:
-            items.append(Item("data", what, why, splash, _rmtree(home, f"Deleted {home}.")))
+            items.append(Item("data", what, why, splash, _remove_data(home, cfg)))
 
     for var in app.stored_in_keychain(list(app.SECRETS.values())):
         items.append(Item(f"keychain-{var.lower()}", f"{app.KEYCHAIN} entry {var}",
@@ -162,7 +226,7 @@ def inventory(cfg: dict) -> list[Item]:
     if tax is not None:
         from . import report, unsorted
         note = report.note_path(cfg, tax)
-        if _scatha_note(note):
+        if app.is_status_note(note):
             items.append(Item("status-note", f"The status note: {note}", "Rewritten after every run with what happened.",
                               "Nothing else. It's scatha's page, not one of your notes.",
                               _unlink(note, f"Deleted {note}.")))

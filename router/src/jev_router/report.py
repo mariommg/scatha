@@ -220,7 +220,7 @@ def note_path(cfg: dict, tax: Taxonomy) -> Path:
 def note(cfg: dict) -> str:
     """The status note: the same facts where the user already looks, rewritten every run."""
     s = state(cfg)
-    out = ["---", "tags: [scatha]", f"updated: {dt.datetime.now().isoformat(timespec='minutes')}", "---", "",
+    out = ["---", app.STATUS_TAG, f"updated: {dt.datetime.now().isoformat(timespec='minutes')}", "---", "",
            f"# {app.APP_NAME}", "", "*Rewritten after every run. Edits here are replaced.*", "", last_run_line(s)]
     if s["mode"] != "off":
         if s["unsorted"]:
@@ -245,11 +245,29 @@ def note(cfg: dict) -> str:
 
 
 def write_note(cfg: dict) -> Path | None:
+    """Rewrite the status note. A note of the user's at that path is never replaced: the status
+    note moves to the first free "scatha status" name beside it, and the config remembers it."""
     try:
         tax = Taxonomy.load(app.taxonomy_path(cfg))
         path = note_path(cfg, tax)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(note(cfg), encoding="utf-8")
-        return path
+        text = note(cfg)
+        names = [path.name] + [f"{app.APP_NAME} status{'' if n == 1 else f' {n}'}.md" for n in range(1, 100)]
+        for name in names:
+            candidate = path.with_name(name)
+            if app.is_status_note(candidate):
+                candidate.write_text(text, encoding="utf-8")
+            else:
+                try:
+                    with candidate.open("x", encoding="utf-8") as f:
+                        f.write(text)
+                except FileExistsError:
+                    continue  # the user's
+            if candidate != path:
+                saved = app.load_config()
+                saved["status_note"] = cfg["status_note"] = str(candidate)
+                app.save_config(saved)
+            return candidate
+        return None
     except OSError:
         return None

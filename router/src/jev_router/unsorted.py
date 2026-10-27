@@ -110,12 +110,8 @@ def write(items: list[tuple[dict, dict[str, float]]], where: Path, tax: Taxonomy
     for b, scores in items:
         if str(b["id"]) in have:
             continue
-        where.mkdir(parents=True, exist_ok=True)
-        path = where / f"{_title(b)}.md"
-        if path.exists():
-            path = where / f"{_title(b)} ({b['id']}).md"
-        path.write_text(render(b, scores, labels, tax.route_at), encoding="utf-8")
-        written.append(path)
+        written.append(app.write_new(where, [_title(b), f"{_title(b)} ({b['id']})"],
+                                     render(b, scores, labels, tax.route_at)))
     if written:
         _remember(where, {str(b["id"]) for b, _ in items})
     return written

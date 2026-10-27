@@ -26,7 +26,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from . import Taxonomy, github
+from . import Taxonomy, app, github
 
 CLAUDE_FLAGS = [
     "-p", "--model", "haiku", "--tools", "", "--strict-mcp-config",
@@ -600,15 +600,11 @@ def cmd_write(args) -> dict:
                 failed.append((r["item_id"], usage["error"]))
                 print(f"  FAILED @{b['author']}: {usage['error'][:200]}")
                 continue
-            folder = folder_for(r)
-            folder.mkdir(parents=True, exist_ok=True)
             name = _slug_title(note["title"])
-            path = folder / f"{name}.md"
-            if path.exists():
-                path = folder / f"{name} (@{b['author']}).md"
             lookup_vitals(repos_in(b), repo_cache)
             vitals = {n: v for n, v in repo_cache.items() if v}
-            path.write_text(render(b, r, note, words, vitals, tax.also), encoding="utf-8")
+            path = app.write_new(folder_for(r), [name, f"{name} (@{b['author']})", f"{name} (@{b['author']}, {b['id']})"],
+                                 render(b, r, note, words, vitals, tax.also))
             tokens += (usage.get("input_tokens") or 0) + (usage.get("output_tokens") or 0)
             written.append((r["item_id"], r["primary"], str(path)))
             print(f"  {r['primary']:17} {path.name}")

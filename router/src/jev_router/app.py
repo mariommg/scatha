@@ -100,6 +100,34 @@ def save_config(cfg: dict) -> Path:
     return config_path()
 
 
+def write_new(folder: Path, stems: list[str], text: str) -> Path:
+    """Write a new note under the first free name, never over an existing file (the user's or ours).
+
+    The stems are tried in order, then the last one with " 2", " 3", ...; each try is an
+    exclusive create, so a file that appears between the check and the write is not replaced."""
+    folder.mkdir(parents=True, exist_ok=True)
+    names = [f"{s}.md" for s in stems] + [f"{stems[-1]} {n}.md" for n in range(2, 1000)]
+    for name in names:
+        try:
+            with (folder / name).open("x", encoding="utf-8") as f:
+                f.write(text)
+            return folder / name
+        except FileExistsError:
+            continue
+    raise FileExistsError(f"no free name for {stems[0]!r} in {folder}")
+
+
+STATUS_TAG = "tags: [scatha]"  # the status note's mark: a note without it is the user's, whatever its name
+
+
+def is_status_note(path: Path) -> bool:
+    """A status note scatha wrote, not a note the user named the same."""
+    try:
+        return path.is_file() and STATUS_TAG in path.read_text(encoding="utf-8", errors="ignore")[:200]
+    except OSError:
+        return False
+
+
 def taxonomy_path(cfg: dict) -> Path:
     p = Path(cfg["taxonomy"]).expanduser()
     return p if p.is_absolute() else home() / p
