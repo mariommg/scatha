@@ -6,30 +6,30 @@ I had 443 bookmarks on X going back to 2018. I had read approximately none of th
 
 That's the bookmark problem: saving feels like learning, and it isn't. The post you saved because it explained something perfectly is gone the moment you scroll past it, buried under four hundred others with no titles, no folders, and no search worth the name.
 
-So this pulls your bookmarks out on a schedule, decides which of your topics each one belongs to (or skips it), reads the whole thing (threads, linked articles, the text in screenshots), and writes it up as a note where you already keep your notes. Each note gets a summary, the key points, a verbatim quote or two so you remember how it *sounded*, and, when a post shares a recipe, prompt, or tool, a how-to: what they did, what they claim it gets you, and the steps to try it yourself.
+**Enter Scatha**. What Scatha does is pull your bookmarks out on a schedule, decides which of your topics each one belongs to (or skips it), reads the whole thing (threads, linked articles, the text in screenshots), and writes it up as a note where you already keep your notes (I use it with [Obsidian](https://obsidian.md/)). Each note gets a summary, the key points, a verbatim quote or two so you remember what it *sounded* like, and, when a post shares a recipe, prompt, or tool, a how-to: what they did, what they claim it gets you, and the steps to try it yourself.
 
-It runs while you sleep. You wake up to notes.
+It runs while you sleep. You wake up to notes. You can read those notes yourself, or process them further using your preferred LLM.
 
 ## How it works
 
 1. **Fetch.** [Smaug](https://github.com/alexknowshtml/smaug) pulls new bookmarks through your own X session, expands links, grabs article text, follows threads and quoted posts, and collects images.
 2. **Read images.** Posts that are mostly screenshots get their images read by Claude Haiku, so a story told in four photos counts as a story.
-3. **Sort.** [Jev](https://typesafe.ai), a small, fast judgment model from TypeSafe, asks one yes/no question per topic ("Is this about AI?") and the bookmark goes to the topic it scores highest on. Nothing fits? It goes to an Unsorted folder as a light note (the post and its links, no summary, no cost), so nothing disappears. Sort those whenever you like, or tell scatha they're not worth keeping: mark them Don't keep on the sorting desk, or just delete the note. Unsorted is scatha's folder, so a deleted note counts as your answer (moving one elsewhere doesn't).
+3. **Sort.** [Jev](https://typesafe.ai), a small, fast judgment model from TypeSafe, asks one yes/no question per topic ("Is this about some-topic?") and the bookmark goes to the topic it scores highest on. Nothing fits? It goes to an Unsorted folder as a light note (the post and its links, no summary, no cost), so nothing disappears. Sort those whenever you like, or tell Scatha they're not worth keeping: mark them "Don't Keep" on the sorting desk, or just delete the note. Unsorted is Scatha's folder, so a deleted note counts as your answer (moving one elsewhere doesn't).
 4. **Write.** Claude Haiku writes the note. Haiku picks the quotes; the code copies them out of the source. Each one shows the source's own words as whole sentences with nothing cut out, so a quoted half-sentence can't lose the "I don't think" in front of it. A quote Haiku can't point to in the source is dropped.
 5. **Remember.** Every processed bookmark goes in a ledger, so nothing is done twice and a note that failed gets retried next run.
-6. **Tell you.** A run at midnight reports to nobody, so scatha leaves a status note in your vault, and typing `scatha` shows what happened and what you can do about it.
+6. **Tell you.** Scatha leaves a status note in your vault after it runs (handy if you run Scatha at odd hours), and typing `scatha` shows what happened and what you can do about it.
 
 ## What you need
 
 - **Node.js 22+** and **[uv](https://docs.astral.sh/uv/)**
 - **An X account** you're logged in to in a browser. One account per computer for now; support for several is on the roadmap but not built yet.
 - **A TypeSafe API key** for Jev ([typesafe.ai](https://typesafe.ai)); a few cents covers hundreds of bookmarks
-- **Claude Code**, logged in (uses your Claude plan), *or* an **Anthropic API key** (pay as you go)
-- **Obsidian** if you want notes in a vault (optional; the notes are plain Markdown)
+- **Claude Code**, logged in (uses your Claude plan), *or* an **Anthropic API key** (pay as you go). Coming soon: ChatGPT support.
+- **Obsidian** if you want notes in a vault (optional; the notes are plain Markdown so they're pretty versatile)
 
 ## Get started
 
-Open `docs/onboarding.html` in your browser and plan your topics, folders, and schedule. It saves a small answers file (no secrets in it, on purpose). Then, from this folder:
+From the Scatha folder, open `docs/onboarding.html` in your browser and plan your topics, folders, and schedule. It saves a small answers file (no secrets in it, on purpose). Then:
 
 ```powershell
 # Windows
@@ -40,6 +40,7 @@ powershell -ExecutionPolicy Bypass -File setup.ps1 --answers $HOME\Downloads\my-
 # macOS / Linux
 ./setup.sh --answers ~/Downloads/my-setup.json
 ```
+... and follow the prompts.
 
 Or skip the planner and run `setup.ps1` / `./setup.sh` with no arguments; the wizard asks everything itself.
 
@@ -53,7 +54,7 @@ Measured on my own backlog, so treat it as one data point:
 - **Claude Code:** about a quarter of a Claude Pro 5-hour usage window per 100 notes.
 - **Anthropic API instead:** roughly a cent per note.
 
-Batch size is yours to set. A big backlog clears a batch per run.
+You can set the batch size to match your usage. A big backlog clears little by little, one batch per run.
 
 ## Where your stuff goes
 
@@ -65,21 +66,21 @@ What leaves your computer: your X session talks to X (it's your login, used the 
 
 - **X can change under us.** Smaug reads X with a copy of the client code from [bird](https://www.npmjs.com/package/@steipete/bird), kept in `smaug/vendor/bird/`. bird's author has stopped maintaining it, so when X changes its internals, the fix lands here, not upstream. If you also install bird 0.8.0, it's tried as a backup whenever the built-in client fails.
 - **This uses your X session cookies** for automated reading, which X's terms don't love. It only reads your own bookmarks, at a modest pace, but it's your account and your call.
-- **Windows is the tested path.** The macOS (launchd) and Linux (systemd) schedulers are written to spec and haven't had their first real run yet. If you're the first, tell me how it went. On a Linux server, run `loginctl enable-linger $USER` once, or the schedule stops when you log out; [the runbook](docs/RUNBOOK.md#on-a-server-with-no-screen-linux-over-ssh) covers the rest of a no-screen install.
+- **Windows is the tested path.** The macOS (launchd) and Linux (systemd) schedulers are written to spec and haven't had their first real run yet. If you're the first, tell me how it went? On a Linux server, run `loginctl enable-linger $USER` once, or the schedule stops when you log out; [the runbook](docs/RUNBOOK.md#on-a-server-with-no-screen-linux-over-ssh) covers the rest of a no-screen install.
 - **Sorting is good, not perfect, and topics blur.** On the first 15 bookmarks I reviewed, Jev matched me 14 times. On 60 close calls I picked out because they were hard, it matched me 36 times, and I wasn't always consistent either. So every note lists every topic it fits, not just the folder it's in, and nothing Jev can't place is thrown away. Your topics, your wording, your mileage.
 
-## What scatha isn't good at
+## What Scatha isn't good at
 
-Some things it can't see, so it can't sort them well. Knowing them saves you from blaming your topics:
+Some things it can't see, so it can't sort them well. Knowing them saves you from blaming your topics (which I did, oops):
 
 - **Video.** Only photos are read. A post whose point is a video is judged on its caption, which is why most memes and jokes land in Unsorted.
 - **Replies under a post.** A thread by the author comes along; replies the author adds under someone else's post, or later comments, don't.
-- **Paywalls.** A paywalled article gives scatha its title and summary, nothing more.
+- **Paywalls.** A paywalled article gives Scatha its title and summary, nothing more.
 - **Deleted accounts.** A bookmark from an account that's gone can't be read at all.
 
 ## When something breaks
 
-`setup status` checks every step, including the logins, and points at the newest log; running `setup` again fixes whatever it finds broken. If a scheduled run can't reach X, Jev, or Claude, it stops before fetching and says in its log (and phone ping, if set) what to fix. [docs/RUNBOOK.md](docs/RUNBOOK.md) covers the rest: expired X logins, changing topics, running it right now, costs, and uninstalling.
+`setup status` checks every step, including the logins, and points at the newest log; running `setup` again fixes whatever it finds broken. If a scheduled run can't reach X, Jev, or Claude, it stops before fetching and says so in its log (and phone ping, if set) what to fix. [docs/RUNBOOK.md](docs/RUNBOOK.md) covers the rest: expired X logins, changing topics, running it right now, costs, and uninstalling.
 
 ## Credits
 
