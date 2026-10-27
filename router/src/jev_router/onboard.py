@@ -269,11 +269,12 @@ def step_x(cfg: dict, verify: bool = True) -> bool:
         say()
         token = secret("auth_token")
         ct0 = secret("ct0")
-        os.environ["AUTH_TOKEN"], os.environ["CT0"] = token, ct0
-        handle = verify_x(cfg) if verify else "(not checked)"
+        # Test the new pair on its own; the saved pair stays until the new one works.
+        handle = verify_x(cfg, (token, ct0)) if verify else "(not checked)"
         if handle:
             where = app.save_secret(app.SECRETS["x_auth_token"], token)
             app.save_secret(app.SECRETS["x_ct0"], ct0)
+            os.environ["AUTH_TOKEN"], os.environ["CT0"] = token, ct0
             ok(f"X sees you as {handle}. Saved to {where}.")
             return True
         bad("X didn't accept those. Double-check you copied the values, not the names, and try again.")
@@ -315,18 +316,42 @@ def step_notes(cfg: dict, preset: str | None = None, verify: bool = True) -> boo
         cfg["notes_backend"], cfg["tools"]["claude"] = "claude-code", claude
     else:
         cfg["notes_backend"] = "anthropic-api"
-        if not app.has_secret(app.SECRETS["anthropic"]):
-            hint("Get a key at https://console.anthropic.com (Settings → API keys).")
-            os.environ[app.SECRETS["anthropic"]] = secret("Anthropic API key")
+        return step_api_key(cfg, verify)
     while err := verify_notes(cfg) if verify else None:
         bad(f"Haiku didn't answer: {checks.notes_error_in_words(err, cfg['notes_backend'])}")
         # Usually fixable without leaving: log in again in another terminal, then retry here
-        if cfg["notes_backend"] != "claude-code" or not yes("Fixed it in another terminal? Try again", default=True):
+        if not yes("Fixed it in another terminal? Try again", default=True):
             return False
-    if cfg["notes_backend"] == "anthropic-api":
-        app.save_secret(app.SECRETS["anthropic"], os.environ[app.SECRETS["anthropic"]])
     ok("Haiku answered.")
     return True
+
+
+def step_api_key(cfg: dict, verify: bool = True) -> bool:
+    """A saved key that works is kept; one that doesn't is replaced, but only by a key that works."""
+    name = app.SECRETS["anthropic"]
+    saved = os.environ.get(name) if app.has_secret(name) else None
+    if saved:
+        err = verify_notes(cfg) if verify else None
+        if not err:
+            ok("Haiku answered.")
+            return True
+        bad(f"Haiku didn't answer with the saved key: {checks.notes_error_in_words(err, cfg['notes_backend'])}")
+        hint("Paste a new key. The saved one stays until a new one works.")
+    else:
+        hint("Get a key at https://console.anthropic.com (Settings → API keys).")
+    for _ in range(3):
+        os.environ[name] = key = secret("Anthropic API key")
+        err = verify_notes(cfg) if verify else None
+        if not err:
+            app.save_secret(name, key)
+            ok("Haiku answered.")
+            return True
+        bad(f"Haiku didn't answer: {checks.notes_error_in_words(err, cfg['notes_backend'])}")
+    if saved:
+        os.environ[name] = saved
+    else:
+        os.environ.pop(name, None)
+    return False
 
 
 # ----- topics and folders -----

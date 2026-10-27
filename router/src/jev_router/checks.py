@@ -23,12 +23,17 @@ def found(tool: str) -> str | None:
     return shutil.which(tool) if tool else None
 
 
-def verify_x(cfg: dict) -> str | None:
-    """Returns the @handle X sees, or None."""
+def verify_x(cfg: dict, cookies: tuple[str, str] | None = None) -> str | None:
+    """Returns the @handle X sees, or None. cookies: (auth_token, ct0) to test instead of the saved
+    ones, under every name the fetcher reads, so a saved copy can't stand in for them."""
     from .run import smaug_env
     app.load_secrets()
+    env = smaug_env(cfg)
+    if cookies:
+        for plain, ours in app.LEGACY_X.items():
+            env[plain] = env[ours] = cookies[0] if plain == "AUTH_TOKEN" else cookies[1]
     try:
-        p = subprocess.run([cfg["tools"]["node"], "src/cli.js", "whoami"], cwd=app.REPO / "smaug", env=smaug_env(cfg),
+        p = subprocess.run([cfg["tools"]["node"], "src/cli.js", "whoami"], cwd=app.REPO / "smaug", env=env,
                            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
     except (OSError, subprocess.TimeoutExpired):
         return None
