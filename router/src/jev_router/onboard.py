@@ -12,8 +12,8 @@
 (setup.ps1 / setup.sh run the same thing; extra words pass through.)
 
 Secrets are typed into hidden prompts, checked against the real service, and only
-then stored (Windows: your user environment variables; macOS/Linux: a file in the
-data folder only you can read). They never go into config.json, the answers file,
+then stored (Windows: Credential Manager, falling back to user environment variables;
+macOS/Linux: a file in the data folder only you can read). They never go into config.json, the answers file,
 or a log.
 
 Prompt conventions: the question comes before its options; Enter takes the answer
@@ -680,6 +680,48 @@ def run_step(n: int, cfg: dict, answers: dict, verify: bool) -> bool:
 
 # ---------- commands ----------
 
+def step_secrets() -> bool:
+    """Move secrets an earlier version kept in user environment variables into Credential Manager.
+    Each one is asked about: other programs may read the same variable."""
+    from .uninstall import USER_VARS
+    if app._keychain() is None:
+        ok("Secrets here live in " + ("secrets.env in your data folder, readable only by you."
+                                      if sys.platform != "win32" else "user environment variables (Credential Manager isn't available)."))
+        return True
+    ours = app.stored_user_vars(list(app.SECRETS.values()))
+    legacy = {p: n for p, n in app.LEGACY_X.items() if app.stored_user_vars([p]) and not app.secret_home(n)}
+    if not ours and not legacy:
+        ok(f"Nothing to move: no secrets of {app.APP_NAME}'s are in user environment variables.")
+        return True
+    question(f"Move your secrets into {app.KEYCHAIN}?")
+    hint("User environment variables are handed to every program you start; Credential Manager gives them only to programs that ask.")
+    picks = []
+    for var in ours:
+        hint(USER_VARS[var] + " Moving it removes the environment variable, so other programs stop seeing it.")
+        if yes(f"Move {var}?"):
+            picks.append((var, None))
+    for plain, name in legacy.items():
+        if yes(f"Copy your X login from {plain} into Credential Manager (as {name})?"):
+            picks.append((plain, name))
+    moved = 0
+    for var, name in picks:
+        if app.move_to_keychain(var, name):
+            moved += 1
+        else:
+            bad(f"{var}: Credential Manager didn't keep it; left where it was.")
+    kept = [p for p, n in legacy.items() if app.keychain_get(n)]
+    if kept:
+        hint(f"{' and '.join(kept)} are still environment variables too, under the plain names bird and other "
+             f"X tools read. {app.APP_NAME} now uses its own copy.")
+        if yes(f"Remove {' and '.join(kept)} from your environment variables?", default=False):
+            for p in kept:
+                app.delete_user_var(p)
+            ok(f"Removed {' and '.join(kept)}.")
+    if moved:
+        ok(f"Moved {moved} to {app.KEYCHAIN}. Open a new terminal: this one still has the old copies.")
+    return True
+
+
 def status() -> None:
     cfg = app.load_config()
     say(bold(f"{app.APP_NAME} status"))
@@ -689,6 +731,15 @@ def status() -> None:
         return
     hint("Checking the logins (a few seconds)…")
     show_recap(assess(cfg))
+    shown = {"X login": app.SECRETS["x_auth_token"], "TypeSafe key": app.SECRETS["typesafe"]}
+    if cfg["notes_backend"] == "anthropic-api":
+        shown["Anthropic key"] = app.SECRETS["anthropic"]
+    for label, n in shown.items():
+        legacy = next((p for p, ours in app.LEGACY_X.items() if ours == n), None)
+        where = app.secret_home(n) or (legacy and app.secret_home(legacy) and f"{app.secret_home(legacy)} ({legacy})")
+        say(f"  {label:<13} kept in {where or 'not saved'}")
+    if app._keychain() and app.stored_user_vars(list(app.SECRETS.values()) + list(app.LEGACY_X)):
+        hint(f"Some secrets are plain environment variables. `{setup_cmd('secrets')}` moves them into {app.KEYCHAIN}.")
     ledger = app.work() / "ingested.md"
     if ledger.exists():
         say(f"  processed     {sum(1 for l in ledger.read_text(encoding='utf-8').splitlines() if 'x.com/' in l)} bookmarks")
@@ -771,7 +822,7 @@ def main(argv: list[str] | None = None) -> int:
     COLOR = enable_color()
     ap = argparse.ArgumentParser(prog=setup_cmd())
     ap.add_argument("command", nargs="?", default="all",
-                    choices=["all", "x-login", "topics", "schedule", "status", "unschedule", "review", "uninstall"])
+                    choices=["all", "x-login", "topics", "schedule", "status", "unschedule", "review", "uninstall", "secrets"])
     ap.add_argument("--answers", help="answers file from docs/onboarding.html (no secrets)")
     ap.add_argument("--rebuild", action="store_true", help="review: re-score every bookmark with the current topics")
     ap.add_argument("--import", dest="import_file", metavar="FILE", help="review: carry over answers from an older review file")
@@ -798,6 +849,8 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "review":
             from . import review
             return review.main(cfg, args.rebuild, args.import_file, not args.no_browser, say)
+        if args.command == "secrets":
+            return 0 if step_secrets() else 1
         if args.command == "unschedule":
             say(scheduler.remove())
             return 0

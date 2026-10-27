@@ -5,7 +5,7 @@
     scatha discover        topics your bookmarks need that you haven't named, and adding them
                            (--pool: just list the bookmarks; --last: decide on the last run again)
     scatha run             import a batch now (same as the schedule; --preview, --batch N)
-    scatha setup [step]    the setup wizard (x-login, topics, schedule, status, unschedule)
+    scatha setup [step]    the setup wizard (x-login, topics, schedule, status, secrets, unschedule)
     scatha uninstall       list what scatha put on this machine; remove only what you pick
 
 Install once with `uv tool install --editable <repo>/router` (setup offers to); it then

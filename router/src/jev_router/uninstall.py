@@ -116,6 +116,13 @@ def _unset(var: str) -> Callable[[], str]:
     return go
 
 
+def _forget(var: str) -> Callable[[], str]:
+    def go() -> str:
+        app.keychain_delete(var)
+        return f"Removed {var} from {app.KEYCHAIN}."
+    return go
+
+
 def inventory(cfg: dict) -> list[Item]:
     """Everything scatha put on this machine that's still here, in the order it's shown."""
     items: list[Item] = []
@@ -143,6 +150,10 @@ def inventory(cfg: dict) -> list[Item]:
         else:
             items.append(Item("data", what, why, splash, _rmtree(home, f"Deleted {home}.")))
 
+    for var in app.stored_in_keychain(list(app.SECRETS.values())):
+        items.append(Item(f"keychain-{var.lower()}", f"{app.KEYCHAIN} entry {var}",
+                          "Saved by setup so scheduled runs can read it.", "Nothing else: only scatha reads this entry.",
+                          _forget(var)))
     for var in app.stored_user_vars(list(USER_VARS)):
         items.append(Item(var.lower(), f"User environment variable {var}", "Saved by setup so scheduled runs can read it.",
                           USER_VARS[var], _unset(var)))

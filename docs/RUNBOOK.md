@@ -101,7 +101,7 @@ The log lands in `~/.scatha/work/logs/` either way.
    └─ notes-preview/         where --preview and the test drive write
 ```
 
-On Windows the secrets are user environment variables: `TWITTER_AUTH_TOKEN`, `TWITTER_CT0`, `TYPESAFE_API_KEY`, and `ANTHROPIC_API_KEY` if you use the API.
+On Windows the secrets are in Windows Credential Manager, under `scatha`: `TWITTER_AUTH_TOKEN`, `TWITTER_CT0`, `TYPESAFE_API_KEY`, and `ANTHROPIC_API_KEY` if you use the API. Credential Manager hands them only to programs that ask; user environment variables, where earlier versions kept them, are handed to every program you start. If Credential Manager isn't available, setup falls back to user environment variables and says so. `setup status` shows where each one is kept, and `setup secrets` moves any that are still environment variables. It asks about each one, because another program of yours may read the same variable; the plain `AUTH_TOKEN` and `CT0` that older setups used are copied, and removed only if you say so, since bird and other X tools read those names. Credential Manager is still readable by any program running as you that asks for it by name: it narrows who sees your secrets, it doesn't lock them.
 
 Each note's front matter carries `source`, `tweet_id`, `author`, `posted`, `captured`, `bucket`, `bucket_score`, `topics`, `topic_scores`, `tags`, and `words`, so Obsidian's Properties and Bases can sort and filter them.
 

@@ -106,18 +106,92 @@ def taxonomy_path(cfg: dict) -> Path:
 
 
 # ---------- secrets ----------
+#
+# On Windows they go in Windows Credential Manager, where only programs that ask can read them;
+# user environment variables (handed to every program you start) are the fallback, and where
+# earlier installs kept them. Elsewhere: secrets.env in the data folder, readable only by you
+# (a Linux timer at 00:01 can't count on an unlocked keyring). Reading order: the live
+# environment, then Credential Manager, then the plain store.
+
+KEYCHAIN = "Windows Credential Manager"
+LEGACY_X = {"AUTH_TOKEN": "TWITTER_AUTH_TOKEN", "CT0": "TWITTER_CT0"}  # older setups' names -> ours
+
+
+def keychain_service() -> str:
+    """One entry per secret for every install, like the environment variables before it: a test install
+    with entries of its own would still delete the shared plain copy the real install reads."""
+    return APP_NAME
+
+
+def _keychain():
+    """The keyring backend scatha uses, or None (not Windows, or no usable backend)."""
+    if sys.platform != "win32":
+        return None
+    try:
+        import keyring
+        kr = keyring.get_keyring()
+    except Exception:
+        return None
+    return kr if getattr(kr, "priority", 0) >= 1 else None
+
+
+def keychain_get(var: str) -> str | None:
+    kc = _keychain()
+    try:
+        return kc.get_password(keychain_service(), var) if kc else None
+    except Exception:
+        return None
+
+
+def keychain_set(var: str, value: str) -> bool:
+    """Store, then read back. False when there's no keychain or it didn't keep the value."""
+    kc = _keychain()
+    if kc is None:
+        return False
+    try:
+        kc.set_password(keychain_service(), var, value)
+        return kc.get_password(keychain_service(), var) == value
+    except Exception:
+        return False
+
+
+def keychain_delete(var: str) -> None:
+    _keychain().delete_password(keychain_service(), var)
+
+
+def stored_in_keychain(names: list[str]) -> list[str]:
+    return [n for n in names if keychain_get(n)]
+
 
 def _secrets_file() -> Path:
     return home() / "secrets.env"
 
 
+def _set_user_var(var: str, value: str) -> None:
+    import winreg
+    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_SET_VALUE) as key:
+        winreg.SetValueEx(key, var, 0, winreg.REG_SZ, value)
+
+
+def _user_var(var: str) -> str | None:
+    import winreg
+    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
+        try:
+            return winreg.QueryValueEx(key, var)[0]
+        except FileNotFoundError:
+            return None
+
+
 def save_secret(var: str, value: str) -> str:
     """Store a secret where the runner (and scheduled runs) can read it. Returns where it went."""
     os.environ[var] = value
+    if keychain_set(var, value):
+        if stored_user_vars([var]):  # a plain copy reaches every new process first, and may go stale
+            delete_user_var(var)
+            os.environ[var] = value
+        return KEYCHAIN
     if sys.platform == "win32":
-        import winreg
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment", 0, winreg.KEY_SET_VALUE) as key:
-            winreg.SetValueEx(key, var, 0, winreg.REG_SZ, value)
+        _set_user_var(var, value)
         return "your Windows user environment variables"
     path = _secrets_file()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -130,44 +204,54 @@ def save_secret(var: str, value: str) -> str:
 
 def load_secrets() -> None:
     """Fill os.environ from wherever save_secret put things, without overriding the live environment."""
-    names = list(SECRETS.values()) + ["AUTH_TOKEN", "CT0"]
+    for n in SECRETS.values():
+        if not os.environ.get(n) and (v := keychain_get(n)):
+            os.environ[n] = v
+    names = list(SECRETS.values()) + list(LEGACY_X)
     if sys.platform == "win32":
-        import winreg
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
-            for n in names:
-                if not os.environ.get(n):
-                    try:
-                        os.environ[n] = winreg.QueryValueEx(key, n)[0]
-                    except FileNotFoundError:
-                        pass
+        for n in names:
+            if not os.environ.get(n) and (v := _user_var(n)):
+                os.environ[n] = v
     elif _secrets_file().exists():
         for line in _secrets_file().read_text().splitlines():
             if "=" in line and not line.startswith("#"):
                 k, v = line.split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip())
-    # bird and Smaug read AUTH_TOKEN / CT0; bring the namespaced copies across
-    os.environ.setdefault("AUTH_TOKEN", os.environ.get("TWITTER_AUTH_TOKEN", ""))
-    os.environ.setdefault("CT0", os.environ.get("TWITTER_CT0", ""))
-    if not os.environ["AUTH_TOKEN"]:
-        os.environ.pop("AUTH_TOKEN")
-    if not os.environ["CT0"]:
-        os.environ.pop("CT0")
+    # bird and Smaug read AUTH_TOKEN / CT0. Our namespaced copy wins: a plain one an older setup
+    # left behind goes stale the first time the X login is redone.
+    for plain, ours in LEGACY_X.items():
+        if os.environ.get(ours):
+            os.environ[plain] = os.environ[ours]
+        elif not os.environ.get(plain):
+            os.environ.pop(plain, None)
+
+
+def secret_home(var: str) -> str | None:
+    """Where a secret is kept, in words, or None if it isn't."""
+    if keychain_get(var):
+        return KEYCHAIN
+    if stored_user_vars([var]):
+        return "a user environment variable"
+    if _secrets_file().exists() and any(l.startswith(var + "=") for l in _secrets_file().read_text().splitlines()):
+        return "secrets.env"
+    return "this terminal only" if os.environ.get(var) else None
+
+
+def move_to_keychain(var: str, as_name: str | None = None) -> bool:
+    """Copy a user environment variable into Credential Manager (under our name for a legacy X one),
+    check it took, then delete the plain copy, except a legacy name's: other X tools read it,
+    so that's the user's call (unset_user_var)."""
+    value, name = _user_var(var), as_name or var
+    if not value or not keychain_set(name, value):
+        return False
+    if var not in LEGACY_X:
+        delete_user_var(var)
+    return True
 
 
 def stored_user_vars(names: list[str]) -> list[str]:
     """Which of these are saved as Windows user environment variables (none elsewhere: secrets.env is in the data folder)."""
-    if sys.platform != "win32":
-        return []
-    import winreg
-    found = []
-    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
-        for n in names:
-            try:
-                winreg.QueryValueEx(key, n)
-                found.append(n)
-            except FileNotFoundError:
-                pass
-    return found
+    return [n for n in names if _user_var(n) is not None] if sys.platform == "win32" else []
 
 
 def delete_user_var(var: str) -> None:

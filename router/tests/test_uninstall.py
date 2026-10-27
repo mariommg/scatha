@@ -45,6 +45,7 @@ def world(tmp_path, monkeypatch):
     env = {"AUTH_TOKEN": "a", "TYPESAFE_API_KEY": "t"}
     monkeypatch.setattr(app, "stored_user_vars", lambda names: [n for n in names if n in env])
     monkeypatch.setattr(app, "delete_user_var", lambda v: env.pop(v))
+    monkeypatch.setattr(app, "stored_in_keychain", lambda names: [])
     monkeypatch.setattr(uninstall, "_tool_installed", lambda: False)
     monkeypatch.setattr(uninstall.shutil, "which", lambda name: None)
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
