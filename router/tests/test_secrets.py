@@ -45,7 +45,22 @@ def machine(tmp_path, monkeypatch):
     monkeypatch.setattr(app, "_user_var", lambda v: reg.get(v))
     monkeypatch.setattr(app, "_set_user_var", lambda v, val: reg.__setitem__(v, val))
     monkeypatch.setattr(app, "delete_user_var", lambda v: (reg.pop(v), app.os.environ.pop(v, None)))
+    # sys.platform is now "win32" for the whole process, and shutil.which would take its Windows-only
+    # path on Linux and crash (2026-10-27 retest, finding C). Nothing here needs a real program.
+    monkeypatch.setattr(app.shutil, "which", lambda *a, **k: None)
     return {"reg": reg, "kc": kc, "mp": monkeypatch}
+
+
+@pytest.fixture
+def file_store(tmp_path, monkeypatch):
+    """Linux and macOS without a keyring: secrets go to secrets.env in the data folder (real file, real reads)."""
+    monkeypatch.setenv(app.HOME_ENV, str(tmp_path / "data"))
+    monkeypatch.setattr(app.sys, "platform", "linux")
+    for n in NAMES:
+        monkeypatch.delenv(n, raising=False)
+    monkeypatch.setattr(app, "_keychain", lambda: FakeKeychain(broken=True))
+    monkeypatch.setattr(app.shutil, "which", lambda *a, **k: None)
+    return {"reg": {}, "mp": monkeypatch}
 
 
 def fresh_process(m):
@@ -184,6 +199,12 @@ def test_a_bad_paste_leaves_the_saved_cookies_alone(machine, monkeypatch):
     assert (app.os.environ["TWITTER_AUTH_TOKEN"], app.os.environ["TWITTER_CT0"]) == ("expired-auth", "expired-ct0")
 
 
+@pytest.fixture(params=["machine", "file_store"])
+def store(request):
+    """Each API-key test runs against faked Credential Manager and against the real secrets.env file."""
+    return request.getfixturevalue(request.param)
+
+
 def api_world(machine, monkeypatch, good):
     from jev_router import onboard
     app.save_secret("ANTHROPIC_API_KEY", "old-key")
@@ -195,20 +216,20 @@ def api_world(machine, monkeypatch, good):
     return onboard, asked, {"notes_backend": "anthropic-api", "tools": {}}
 
 
-def test_a_rejected_api_key_can_be_replaced(machine, monkeypatch):
-    onboard, asked, cfg = api_world(machine, monkeypatch, good="new-key")
+def test_a_rejected_api_key_can_be_replaced(store, monkeypatch):
+    onboard, asked, cfg = api_world(store, monkeypatch, good="new-key")
     assert onboard.step_notes(cfg, preset="anthropic-api") is True and asked
-    fresh_process(machine)
+    fresh_process(store)
     assert app.os.environ["ANTHROPIC_API_KEY"] == "new-key"
 
 
-def test_a_replacement_that_also_fails_keeps_the_saved_key(machine, monkeypatch):
-    onboard, asked, cfg = api_world(machine, monkeypatch, good="neither")
+def test_a_replacement_that_also_fails_keeps_the_saved_key(store, monkeypatch):
+    onboard, asked, cfg = api_world(store, monkeypatch, good="neither")
     assert onboard.step_notes(cfg, preset="anthropic-api") is False and len(asked) == 3
-    fresh_process(machine)
+    fresh_process(store)
     assert app.os.environ["ANTHROPIC_API_KEY"] == "old-key"
 
 
-def test_a_working_api_key_is_kept_without_asking(machine, monkeypatch):
-    onboard, asked, cfg = api_world(machine, monkeypatch, good="old-key")
+def test_a_working_api_key_is_kept_without_asking(store, monkeypatch):
+    onboard, asked, cfg = api_world(store, monkeypatch, good="old-key")
     assert onboard.step_notes(cfg, preset="anthropic-api") is True and asked == []
