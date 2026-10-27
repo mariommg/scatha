@@ -20,7 +20,8 @@ import stat
 import sys
 from pathlib import Path
 
-APP_NAME = "scatha"
+APP_NAME = "scatha"  # the command, file and folder names
+DISPLAY_NAME = "Scatha"  # the program, in sentences
 HOME_DIRNAME = ".scatha"
 HOME_ENV = "SCATHA_HOME"
 TASK_NAME = "Scatha-Ingest"  # Windows Task Scheduler / launchd / systemd unit stem

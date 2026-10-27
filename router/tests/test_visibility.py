@@ -117,7 +117,7 @@ def test_banner_shows_until_the_user_looks(home):
     assert report.banner() is None
     report.record_run({"ai": 3}, 2, 1, 50, "light")
     line = report.banner()
-    assert "3 new notes, 2 went to Unsorted, 1 failed and will retry" in line
+    assert "3 new notes. 2 went to Unsorted. 1 failed (it will try again next run)." in line
     report.mark_seen()
     assert report.banner() is None
 
@@ -141,7 +141,7 @@ def test_status_note_lists_newest_unsorted(home):
     report.record_run({}, 12, 0, None, "light")
     path = report.write_note(cfg)
     text = path.read_text(encoding="utf-8")
-    assert text.count("- [[") == 10 and "and 2 more" in text and "Edits here are replaced" in text
+    assert text.count("- [[") == 10 and "and 2 more" in text and "any edits here will be lost" in text
 
 
 def test_cli_bare_is_the_report_and_counts_as_looking(home, capsys):
@@ -332,7 +332,7 @@ def test_report_counts_what_was_not_worth_keeping(home):
     unsorted.check(cfg, tax)
     desk.Verdicts(review.verdicts_path()).put("2", {"verdict": desk.DROP, "source": "desk"})
     out = report.text(cfg)
-    assert "Not worth keeping: 2 (1 deleted from Unsorted, 1 marked on the desk)" in out
+    assert "Not worth keeping: 2 (1 deleted from Unsorted, 1 marked Don't Keep on the desk)" in out
 
 
 def test_cli_bare_checks_for_deletions_first(home, capsys, monkeypatch):
