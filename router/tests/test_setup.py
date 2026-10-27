@@ -364,3 +364,47 @@ def test_step_4_waits_for_a_login_fix_instead_of_quitting(home, monkeypatch, cap
     assert onboard.step_notes(cfg, preset="claude-code")
     assert "/login" in capsys.readouterr().out
     assert cfg["tools"]["claude"] == "/home/u/.local/bin/claude"
+
+
+def _uv_tool_dir(monkeypatch, tool_dir, receipt):
+    """Fake `uv tool dir` and the receipt uv keeps for the scatha command."""
+    (tool_dir / onboard.TOOL).mkdir(parents=True)
+    (tool_dir / onboard.TOOL / "uv-receipt.toml").write_text(receipt, encoding="utf-8")
+    ran = []
+
+    def fake_run(cmd, **kw):
+        ran.append(cmd)
+        return onboard.subprocess.CompletedProcess(cmd, 0, stdout=f"{tool_dir}\n" if cmd[:3] == ["uv", "tool", "dir"] else "", stderr="")
+    monkeypatch.setattr(onboard.shutil, "which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr(onboard.subprocess, "run", fake_run)
+    return ran
+
+
+def _receipt(src):
+    return f'[tool]\nrequirements = [{{ name = "{onboard.TOOL}", editable = "{src.as_posix()}" }}]\n'
+
+
+def test_a_moved_scatha_folder_gets_its_command_back(tmp_path, monkeypatch, capsys):
+    # 2026-10-27: moving the folder left `scatha` pointing at the old spot, and setup only checked it was on PATH
+    gone = tmp_path / "old" / "router"
+    ran = _uv_tool_dir(monkeypatch, tmp_path / "tools", _receipt(gone))
+    assert onboard.installed_source() == gone
+    assert onboard.install_command()
+    assert ["uv", "tool", "install", "--force", "--editable", str(app.REPO / "router")] in ran
+    assert "is gone" in capsys.readouterr().out
+
+
+def test_a_second_copy_leaves_the_command_alone(tmp_path, monkeypatch):
+    # a test clone running setup must not take over the command while the real folder still exists
+    other = tmp_path / "other" / "router"
+    other.mkdir(parents=True)
+    ran = _uv_tool_dir(monkeypatch, tmp_path / "tools", _receipt(other))
+    onboard.repair_command()
+    assert not any(cmd[:3] == ["uv", "tool", "install"] for cmd in ran)
+
+
+def test_an_unreadable_receipt_changes_nothing(tmp_path, monkeypatch):
+    ran = _uv_tool_dir(monkeypatch, tmp_path / "tools", "not toml [")
+    assert onboard.installed_source() is None
+    onboard.repair_command()
+    assert not any(cmd[:3] == ["uv", "tool", "install"] for cmd in ran)

@@ -249,9 +249,7 @@ Batch size lives in `config.json` (or `scatha setup schedule`). For a big backlo
 ## 9. Moving, pausing, uninstalling
 
 - **Pause:** `scatha setup unschedule`. Bring it back with `scatha setup schedule`.
-- **Move the Scatha folder** (the program): move it, then open a terminal in its new spot. The `scatha` command still points at the old spot, so use the long form here:
-  1. `powershell -ExecutionPolicy Bypass -File setup.ps1 schedule` on Windows, or `./setup.sh schedule` on macOS and Linux. That points the schedule at the new spot.
-  2. `uv tool install --force --editable router` puts the `scatha` command back.
+- **Move the Scatha folder** (the program): move it, then open a terminal in its new spot. The `scatha` command still points at the old spot, so use the long form here: `powershell -ExecutionPolicy Bypass -File setup.ps1 schedule` on Windows, or `./setup.sh schedule` on macOS and Linux. That points the schedule at the new spot and puts the `scatha` command back.
 - **Move the data folder** (`~/.scatha`): set `SCATHA_HOME` to the new location (as a user environment variable), move the folder, then run `scatha setup schedule`.
 
 ### Uninstalling

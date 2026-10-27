@@ -34,6 +34,7 @@ from pathlib import Path
 
 from . import app, checks, scheduler, topics, vaults
 from .checks import verify_notes, verify_typesafe, verify_x
+from .uninstall import TOOL
 
 # ---------- output ----------
 
@@ -489,23 +490,61 @@ def step_unsorted(cfg: dict, destinations: list[Path], preset: str | None = None
     ok(f"Unsorted: {cfg['unsorted']['folder']}" if choice else "Unsorted: off (ledger only)")
 
 
-def install_command() -> bool:
-    """Put `scatha` on PATH (uv tool, editable, so it follows this checkout)."""
-    import shutil
-    import subprocess
-    if shutil.which(app.APP_NAME):
-        return True
-    say()
-    question(f"Install the `{app.APP_NAME}` command?")
-    hint(f"Then `{app.APP_NAME}` works from any folder: it shows what happened and what you can do.")
-    if not yes(f"Install `{app.APP_NAME}` now (uv tool install)?"):
-        return False
+def installed_source() -> Path | None:
+    """The folder the installed `scatha` command runs from, read from uv's receipt; None if unknown."""
+    import tomllib
+    if not shutil.which("uv"):
+        return None
+    proc = subprocess.run(["uv", "tool", "dir"], capture_output=True, text=True)
+    if proc.returncode != 0:
+        return None
+    try:
+        receipt = tomllib.loads((Path(proc.stdout.strip()) / TOOL / "uv-receipt.toml").read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+    for req in receipt.get("tool", {}).get("requirements", []):
+        if req.get("name") == TOOL and req.get("editable"):
+            return Path(req["editable"])
+    return None
+
+
+def _install() -> bool:
     proc = subprocess.run(["uv", "tool", "install", "--force", "--editable", str(app.REPO / "router")],
                           capture_output=True, text=True)
     if proc.returncode != 0:
         bad(f"Couldn't install it: {(proc.stderr or proc.stdout).strip()[-200:]}")
         return False
     subprocess.run(["uv", "tool", "update-shell"], capture_output=True, text=True)
+    return True
+
+
+def repair_command() -> None:
+    """Point `scatha` at this folder again if the folder it ran from is gone (the Scatha folder was moved).
+
+    Only when the old folder is gone: a second copy (a test clone) must not take the command over."""
+    if not shutil.which(app.APP_NAME):
+        return
+    src = installed_source()
+    if src is None or src.exists() or src.resolve() == (app.REPO / "router").resolve():
+        return
+    say()
+    say(f"  The `{app.APP_NAME}` command points at {src}, which is gone. Pointing it here.")
+    if _install():
+        ok(f"Fixed. Open a new terminal, then type `{app.APP_NAME}`.")
+
+
+def install_command() -> bool:
+    """Put `scatha` on PATH (uv tool, editable, so it follows this checkout)."""
+    if shutil.which(app.APP_NAME):
+        repair_command()
+        return True
+    say()
+    question(f"Install the `{app.APP_NAME}` command?")
+    hint(f"Then `{app.APP_NAME}` works from any folder: it shows what happened and what you can do.")
+    if not yes(f"Install `{app.APP_NAME}` now (uv tool install)?"):
+        return False
+    if not _install():
+        return False
     ok(f"Installed. Open a new terminal, then type `{app.APP_NAME}`.")
     return True
 
@@ -853,7 +892,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "topics":
             return 0 if step_topics(cfg, answers.get("topics"), answers.get("draft_definitions")) else 1
         if args.command == "schedule":
-            return 0 if step_schedule(cfg, answers.get("schedule"), answers.get("batch_size")) else 1
+            done = step_schedule(cfg, answers.get("schedule"), answers.get("batch_size"))
+            repair_command()  # after a move, `setup schedule` is the one step the RUNBOOK asks for
+            return 0 if done else 1
         if args.command == "review":
             from . import review
             return review.main(cfg, args.rebuild, args.import_file, not args.no_browser, say)
