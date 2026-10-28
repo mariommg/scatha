@@ -1,6 +1,6 @@
 """Scatha never writes over a file it can't show is its own.
 
-From the 2026-10-27 pre-release review (findings 1 and 2), whose probes showed a note
+Probes on 2026-10-27 showed a note
 written over another note with the same title, a personal note at the fallback name
 overwritten, and a personal `scatha.md` replaced by the status note. What these pin: every
 bookmark written gets its own file; a personal note at any candidate name survives; a rerun

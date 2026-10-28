@@ -152,7 +152,7 @@ def test_unsorted_can_go_anywhere_or_nowhere(home, tmp_path, monkeypatch):
 
 
 def test_wizard_points_at_the_setup_script_not_a_bare_command(monkeypatch):
-    # cold read 2026-10-27: a bare .\setup.ps1 fails under Windows' default execution policy
+    # a bare .\setup.ps1 fails under Windows' default execution policy
     for platform, script in [("win32", "powershell -ExecutionPolicy Bypass -File setup.ps1 x-login"),
                              ("linux", "./setup.sh x-login")]:
         monkeypatch.setattr(onboard.sys, "platform", platform)
@@ -160,7 +160,7 @@ def test_wizard_points_at_the_setup_script_not_a_bare_command(monkeypatch):
 
 
 def test_note_cost_speaks_the_chosen_backend():
-    # cold read 2026-10-27: "2,000 Claude tokens each" matched neither the plan nor the API wording
+    # "2,000 Claude tokens each" matched neither the plan nor the API wording
     assert "Claude plan" in app.note_cost({"notes_backend": "claude-code"})
     assert "cent" in app.note_cost({"notes_backend": "anthropic-api"})
 
@@ -200,7 +200,7 @@ def test_working_install_offers_changes_instead_of_rerunning(home, monkeypatch):
 
 
 def test_resumed_setup_still_offers_the_command(home, monkeypatch):
-    # cold read 2026-10-27: stopped after step 6, rerun, Enter: no `scatha` command and no offer of one
+    # stopped after step 6, rerun, Enter: there was no `scatha` command and no offer of one
     app.save_config({})
     monkeypatch.setattr(onboard, "assess", lambda cfg: states())
     offered = []
@@ -211,7 +211,7 @@ def test_resumed_setup_still_offers_the_command(home, monkeypatch):
 
 
 def test_a_failed_test_drive_is_not_all_set(home, monkeypatch, capsys):
-    # cold read 2026-10-27: "The test run stopped", then "All set." and exit 0
+    # it used to say "The test run stopped", then "All set." and exit 0
     monkeypatch.setattr(onboard, "run_step", lambda n, *a: n != 7)
     monkeypatch.setattr(onboard, "install_command", lambda: True)
     assert onboard.onboard({}) == 1
@@ -463,7 +463,7 @@ def test_an_unreadable_receipt_changes_nothing(tmp_path, monkeypatch):
     assert not any(cmd[:3] == ["uv", "tool", "install"] for cmd in ran)
 
 
-# 2026-10-27 pre-release review, finding 9: a failed npm install passed step 1, and Smaug failing to
+# A failed npm install used to pass step 1, and Smaug failing to
 # start later looked like rejected X cookies.
 
 @pytest.fixture

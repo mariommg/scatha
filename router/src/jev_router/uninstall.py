@@ -53,7 +53,7 @@ class Item:
 # Every file scatha writes below work/ and tuning/, by where it is (paths relative to the data
 # folder). A file anywhere else there, whatever its kind, isn't provably scatha's, and the data
 # folder isn't offered for deletion. A file type is not ownership: a personal export.json in
-# work/ looks like ours by its extension alone (2026-10-27 retest, finding A).
+# work/ looks like ours by its extension alone.
 _STAMP = r"\d{4}-\d\d-\d\d_\d{4}"
 OWNED = [re.compile(p) for p in (
     r"work/(ingested\.md|pending-bookmarks\.json(\.full)?|bookmarks-state\.json|runs\.jsonl|last-stop\.json"

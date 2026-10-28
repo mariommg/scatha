@@ -18,6 +18,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 
-# Session handoff (personal paths and history)
+# Local working notes (personal paths and history)
 HANDOFF.md
 RETEST-HOWTO.md
+COMPARISON.md

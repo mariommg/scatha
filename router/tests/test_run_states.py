@@ -1,6 +1,6 @@
 """Every bookmark a run takes ends somewhere the user can see: a note, Unsorted, or a retry.
 
-From the 2026-10-27 pre-release review, whose probes found runs that reported success while
+Probes on 2026-10-27 found runs that reported success while
 a bookmark went nowhere. What these pin: a bookmark between the two thresholds (when someone
 sets them apart, as the RUNBOOK suggests) goes to Unsorted and the ledger like any skip, so
 the desk and discovery can reach it. Routing, Haiku, X and ntfy are faked; files are real.
@@ -117,7 +117,7 @@ def test_when_every_image_read_fails_nothing_is_ledgered(world, monkeypatch):
     assert not (app.work() / "pending-bookmarks.json").exists()
 
 
-# Finding 10: a run that stopped early left the report and status note showing the last success.
+# A run that stopped early used to leave the report and status note showing the last success.
 
 def test_a_stopped_run_shows_in_the_report_with_steps_to_try(world, monkeypatch):
     data, vault, cfg = world
@@ -151,7 +151,7 @@ def test_the_next_run_that_gets_through_clears_the_stop(world, monkeypatch):
 
 
 def test_a_run_with_nothing_new_clears_the_stop_in_the_vault_too(world, monkeypatch):
-    # 2026-10-27 retest, finding B: the terminal cleared, the status note kept "The last run stopped"
+    # the terminal cleared, the status note kept "The last run stopped"
     data, vault, cfg = world
     report.record_run({"ai": 5}, 0, 0, 0, "light")
     report.record_stop("fetch", ["Fetching your bookmarks from X failed."])

@@ -165,7 +165,7 @@ def test_run_with_a_small_pool_makes_no_model_call(home, monkeypatch):
 
 
 def test_pool_only_is_free(home, monkeypatch):
-    # cold read 2026-10-27: --pool built the desk first, which can score new bookmarks and translate posts
+    # --pool used to build the desk first, which can score new bookmarks and translate posts
     calls = fake_world(monkeypatch, [item(i, 0.1, 0.1) for i in range(1, 8)], {"topics": []}, {})
     monkeypatch.setattr(review, "build", lambda *a, **k: pytest.fail("--pool must not score"))
     out = []

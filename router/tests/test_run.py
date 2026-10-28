@@ -103,7 +103,7 @@ def test_failed_notes_stay_out_of_the_ledger(fake):
     assert "1 failed" in fake.pings[-1]
 
 
-# ----- the run lock: one run at a time (review #3) -----
+# ----- the run lock: one run at a time -----
 
 RACER = """
 import pathlib, sys, time

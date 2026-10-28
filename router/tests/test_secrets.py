@@ -46,7 +46,7 @@ def machine(tmp_path, monkeypatch):
     monkeypatch.setattr(app, "_set_user_var", lambda v, val: reg.__setitem__(v, val))
     monkeypatch.setattr(app, "delete_user_var", lambda v: (reg.pop(v), app.os.environ.pop(v, None)))
     # sys.platform is now "win32" for the whole process, and shutil.which would take its Windows-only
-    # path on Linux and crash (2026-10-27 retest, finding C). Nothing here needs a real program.
+    # path on Linux and crash. Nothing here needs a real program.
     monkeypatch.setattr(app.shutil, "which", lambda *a, **k: None)
     return {"reg": reg, "kc": kc, "mp": monkeypatch}
 
@@ -158,7 +158,7 @@ def test_a_broken_keyring_never_breaks_a_run(machine, monkeypatch):
     assert app.os.environ["TYPESAFE_API_KEY"] == "k"
 
 
-# 2026-10-27 pre-release review, finding 4: renewing a login tested the saved pair, not the new one,
+# Renewing a login used to test the saved pair, not the new one,
 # and a rejected API key could never be replaced. The fetcher and Haiku are faked.
 
 def x_world(machine, monkeypatch, works):

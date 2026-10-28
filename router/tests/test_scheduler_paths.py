@@ -1,6 +1,6 @@
 """The schedule still runs when the data folder's path has spaces, quotes, $ or %.
 
-From the 2026-10-27 pre-release review (finding 7): the systemd unit and the crontab line
+The systemd unit and the crontab line used to
 put the wrapper's path in unquoted, so a data folder under "scheduled space/" registered fine
 and then never ran. What these pin: every place a path goes (the PowerShell and bash
 wrappers, the Task Scheduler command, the systemd unit, the crontab line, the plist) gives

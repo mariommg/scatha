@@ -142,7 +142,7 @@ def test_one_stuck_item_does_not_stop_the_rest(world, monkeypatch):
     assert world["env"] == {"AUTH_TOKEN": "a"}
 
 
-# 2026-10-27 pre-release review, finding 3: a vault or a personal note inside work/ went with the data folder.
+# A vault or a personal note inside work/ used to go with the data folder.
 
 def test_a_vault_or_note_inside_the_data_folder_stops_its_deletion(world):
     nested = world["data"] / "work" / "PersonalVault"
@@ -183,7 +183,7 @@ SCATHAS_OWN = [  # one of everything scatha writes below work/ and tuning/
 ]
 
 
-# 2026-10-27 retest 2: the X client's own cache blocked removal. The list of what scatha writes is kept
+# The X client's own cache once blocked removal. The list of what scatha writes is kept
 # by hand, so these tie it to the writers: every cache x.js names, and the real cache writer's output.
 
 def test_every_cache_the_x_client_names_is_owned():
@@ -225,7 +225,7 @@ def test_what_scatha_writes_there_is_still_deletable(world):
     assert uninstall.data_folder_problem(world["data"], app.load_config()) is None
 
 
-# 2026-10-27 retest, finding A: a familiar file type is not ownership.
+# A familiar file type is not ownership.
 
 @pytest.mark.parametrize("rel", ["work/PersonalExports/personal.json", "work/PersonalExports/personal.yaml",
                                  "work/PersonalExports/personal.jsonl", "work/PersonalExports/personal.log",
