@@ -129,6 +129,7 @@ def home(tmp_path, monkeypatch):
 def fake_world(monkeypatch, items, proposal, cand_scores):
     deck = deck_of(items)
     monkeypatch.setattr(review, "build", lambda cfg, say=print, reuse=False: deck)
+    monkeypatch.setattr(review, "cached_deck", lambda cfg: deck)
     monkeypatch.setattr(review, "collect_bookmarks", lambda work: {it["id"]: {"id": it["id"]} for it in items})
     calls = []
 
@@ -164,10 +165,29 @@ def test_run_with_a_small_pool_makes_no_model_call(home, monkeypatch):
 
 
 def test_pool_only_is_free(home, monkeypatch):
+    # cold read 2026-10-27: --pool built the desk first, which can score new bookmarks and translate posts
     calls = fake_world(monkeypatch, [item(i, 0.1, 0.1) for i in range(1, 8)], {"topics": []}, {})
+    monkeypatch.setattr(review, "build", lambda *a, **k: pytest.fail("--pool must not score"))
     out = []
     assert discover.run(app.load_config(), say=out.append, pool_only=True) is None
     assert not calls and "7 bookmarks fit no topic well" in out[0]
+
+
+def test_pool_only_says_what_it_leaves_out(home, monkeypatch):
+    fake_world(monkeypatch, [item(i, 0.1, 0.1) for i in range(1, 8)], {"topics": []}, {})
+    monkeypatch.setattr(review, "collect_bookmarks", lambda work: {str(i): {} for i in range(1, 10)})
+    out = []
+    discover.run(app.load_config(), say=out.append, pool_only=True)
+    assert "leaves out 2 newer bookmarks" in out[-1]
+
+
+def test_pool_only_without_a_scored_desk(home, monkeypatch):
+    fake_world(monkeypatch, [], {"topics": []}, {})
+    monkeypatch.setattr(review, "cached_deck", lambda cfg: None)
+    monkeypatch.setattr(review, "build", lambda *a, **k: pytest.fail("--pool must not score"))
+    out = []
+    assert discover.run(app.load_config(), say=out.append, pool_only=True) is None
+    assert "hasn't scored" in out[0]
 
 
 def test_answers_on_the_desk_leave_the_pool(home, monkeypatch):

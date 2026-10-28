@@ -191,6 +191,51 @@ def test_working_install_offers_changes_instead_of_rerunning(home, monkeypatch):
     assert ran == [5]
 
 
+def test_resumed_setup_still_offers_the_command(home, monkeypatch):
+    # cold read 2026-10-27: stopped after step 6, rerun, Enter: no `scatha` command and no offer of one
+    app.save_config({})
+    monkeypatch.setattr(onboard, "assess", lambda cfg: states())
+    offered = []
+    monkeypatch.setattr(onboard, "install_command", lambda: offered.append(1) or False)
+    answers(monkeypatch, "")
+    assert onboard.onboard({}) == 0
+    assert offered == [1]
+
+
+def test_a_failed_test_drive_is_not_all_set(home, monkeypatch, capsys):
+    # cold read 2026-10-27: "The test run stopped", then "All set." and exit 0
+    monkeypatch.setattr(onboard, "run_step", lambda n, *a: n != 7)
+    monkeypatch.setattr(onboard, "install_command", lambda: True)
+    assert onboard.onboard({}) == 1
+    out = capsys.readouterr().out
+    assert "test drive didn't work" in out and "All set." not in out
+    assert "scatha setup`, then type 7" in out
+
+
+def test_a_skipped_test_drive_is_still_all_set(home, monkeypatch, capsys):
+    monkeypatch.setattr(onboard, "run_step", lambda n, *a: None if n == 7 else True)
+    monkeypatch.setattr(onboard, "install_command", lambda: True)
+    assert onboard.onboard({}) == 0
+    assert "All set." in capsys.readouterr().out
+
+
+def test_step_test_reports_a_stopped_run(home, monkeypatch):
+    monkeypatch.setattr(onboard, "yes", lambda *a, **k: True)
+    monkeypatch.setattr(onboard.scheduler, "run_now", lambda args: 2)
+    assert onboard.step_test(app.load_config()) is False
+    monkeypatch.setattr(onboard.scheduler, "run_now", lambda args: 0)
+    assert onboard.step_test(app.load_config()) is True
+    monkeypatch.setattr(onboard, "yes", lambda *a, **k: False)
+    assert onboard.step_test(app.load_config()) is None
+
+
+def test_command_installed_in_another_terminal_is_not_offered_again(tmp_path, monkeypatch):
+    monkeypatch.setattr(onboard.shutil, "which", lambda name: None)
+    monkeypatch.setattr(onboard, "installed_source", lambda: tmp_path / "router")
+    monkeypatch.setattr(onboard, "yes", lambda *a, **k: pytest.fail("asked again"))
+    assert onboard.install_command()
+
+
 def test_first_run_goes_through_every_step(home, monkeypatch):
     ran = []
     monkeypatch.setattr(onboard, "run_step", lambda n, *a: ran.append(n) or True)

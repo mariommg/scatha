@@ -197,8 +197,15 @@ def assess(cands: list[dict], scores: dict[str, dict], deck: dict, answers: dict
 
 def run(cfg: dict, say=print, pool_only: bool = False) -> dict | None:
     tax = Taxonomy.load(app.taxonomy_path(cfg))
-    app.haiku_env(cfg)  # Jev's key for scoring new bookmarks; Haiku for translations and the proposal
-    deck = review.build(cfg, say=say, reuse=True)
+    if pool_only:  # free: the desk as Jev last scored it, no new scoring or translation
+        deck = review.cached_deck(cfg)
+        if deck is None:
+            say(f"  Jev hasn't scored your bookmarks against these topics yet, so there's no list to show. "
+                f"To score them (a few cents), type `{app.command('review')}`.")
+            return None
+    else:
+        app.haiku_env(cfg)  # Jev's key for scoring new bookmarks; Haiku for translations and the proposal
+        deck = review.build(cfg, say=say, reuse=True)
     answers = desk.Verdicts(review.verdicts_path()).load()
     led = review.ledger(app.work())
     items = pool(deck, answers, led)
@@ -211,6 +218,10 @@ def run(cfg: dict, say=print, pool_only: bool = False) -> dict | None:
     if pool_only:
         for it in items:
             say(f"    {it['id']}  @{it.get('author')}  {gist(it, 100)[:110]}")
+        newer = len(set(review.collect_bookmarks(app.work())) - {it["id"] for it in deck["items"]})
+        if newer:
+            say(f"  (This list leaves out {_n(newer, 'newer bookmark')} that Jev hasn't scored yet. "
+                f"To score them, type `{app.command('review')}`.)")
         return None
     if len(items) < MIN_MEMBERS:
         say(f"  Too few to find a pattern. A new topic needs at least {MIN_MEMBERS} bookmarks, "

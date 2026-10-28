@@ -251,6 +251,15 @@ def test_build_translates_only_unnoted_and_caches(home):
     assert len(home.calls) == 1  # cached
 
 
+def test_cached_deck_only_matches_the_current_topics(home):
+    assert review.cached_deck(app.load_config()) is None  # no desk yet
+    built = review.build(app.load_config(), say=lambda *a: None)
+    assert review.cached_deck(app.load_config()) == built
+    stale = built | {"topics_hash": "old topics"}
+    review.deck_path().write_text(json.dumps(stale), encoding="utf-8")
+    assert review.cached_deck(app.load_config()) is None
+
+
 def test_import_legacy_never_overwrites_desk_answers(home, tmp_path):
     tax = Taxonomy.load(app.home() / "topics.yaml")
     store = desk.Verdicts(review.verdicts_path())

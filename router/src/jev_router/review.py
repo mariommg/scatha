@@ -214,6 +214,15 @@ async def score(bookmarks: dict[str, dict], tax: Taxonomy) -> list:
     return await Router(tax).route_many(items)
 
 
+def cached_deck(cfg: dict) -> dict | None:
+    """The desk as last built, if it was scored against the current topics. Costs nothing."""
+    if not deck_path().exists():
+        return None
+    deck = json.loads(deck_path().read_text(encoding="utf-8"))
+    tax = Taxonomy.load(app.taxonomy_path(cfg))
+    return deck if deck.get("topics_hash") == desk.topics_hash(topic_list(tax)) else None
+
+
 def build(cfg: dict, say=print, reuse: bool = False) -> dict:
     """Score every processed bookmark. reuse=True keeps the scores already on the desk (same topics)
     and scores only bookmarks processed since, so opening the desk after a run costs pennies or nothing."""
