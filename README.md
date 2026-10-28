@@ -59,7 +59,7 @@ Install these three, in this order.
    ```
 
    When it's done, close the window. (New tools only show up in windows opened afterward.)
-3. **Claude Code.** Install it by following the Windows steps at [claude.com/claude-code](https://claude.com/claude-code). Then open a *new* PowerShell window, type `claude`, press **Enter**, and log in with your Claude account. Close the window when you're done.
+3. **Claude Code.** (_skip if you're using Anthropic's API_) Install it by following the Windows steps at [claude.com/claude-code](https://claude.com/claude-code). Then open a *new* PowerShell window, type `claude`, press **Enter**, and log in with your Claude account. Close the window when you're done.
 
 While you're at it, get your **TypeSafe API key** from [typesafe.ai](https://typesafe.ai), and make sure you're **logged in to X** in your browser. Setup asks for both.
 
@@ -155,7 +155,7 @@ You can set the batch size to match your usage. A big backlog clears little by l
 
 Your settings, your topics, and the ledger live in one data folder (`~/.scatha`). Your secrets stay with your account: Windows Credential Manager (handed only to programs that ask for them), or a file only your account can open on macOS and Linux. They never go in a config file, the answers file, or a log.
 
-What leaves your computer: your X session talks to X (it's your login, used the way your browser uses it). Bookmark text goes to TypeSafe for sorting and to Anthropic for writing notes. That's it.
+What leaves your computer: your X session talks to X (it's your login, used the way your browser uses it). Bookmark text goes to TypeSafe for sorting and to Anthropic for writing notes. Scatha fetches the web pages referenced in your bookmarks. If you set up ntfy for notifications, you'll see some text and counts there as well.
 
 Leaving? `scatha uninstall` lists everything Scatha put on your computer and removes only what you pick. Your notes stay; they're yours.
 
@@ -180,7 +180,7 @@ Some things it can't see, so it can't sort them well. Knowing them saves you fro
 
 ## When something breaks
 
-`setup status` checks every step, including the logins, and points at the newest log. Running `setup` again fixes whatever it finds broken.
+`setup setup status` checks every step, including the logins, and points at the newest log. Running `scatha setup` again fixes whatever it finds broken.
 
 If a scheduled run can't reach X, Jev, or Claude, it stops before fetching. Its log (and phone ping, if you set one up) says what to fix. [docs/RUNBOOK.md](docs/RUNBOOK.md) covers the rest: expired X logins, changing topics, running it right now, and costs.
 
