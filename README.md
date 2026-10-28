@@ -1,3 +1,5 @@
+
+
 # scatha
 
 *Your X bookmarks, sorted into topics you choose and written up as notes in Obsidian (or any folder), on a schedule.*
@@ -124,7 +126,7 @@ Stopped partway? Run the same line again. Setup remembers your answers and picks
 
 ## Getting started on macOS or Linux
 
-1. Install [Node.js](https://nodejs.org/) 22 or newer, [uv](https://docs.astral.sh/uv/getting-started/installation/), and [Claude Code](https://claude.com/claude-code) (_skip if you're using Anthropic's API). Run `claude` once and log in.
+1. Install [Node.js](https://nodejs.org/) 22 or newer, [uv](https://docs.astral.sh/uv/getting-started/installation/), and [Claude Code](https://claude.com/claude-code) (_skip if you're using Anthropic's API_). Run `claude` once and log in.
 2. Download Scatha (the green **Code** button, then **Download ZIP**, or `git clone https://github.com/mariommg/scatha.git`). Unzip it somewhere permanent: the folder *is* the program, and the schedule runs it from there.
 3. Open a terminal in the Scatha folder. (macOS: in Finder, right-click the folder and choose **Services → New Terminal at Folder**.)
 4. Optional: plan your topics in `docs/onboarding.html`, which saves `my-setup.json` to your Downloads folder.
