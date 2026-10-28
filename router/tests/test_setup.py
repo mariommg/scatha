@@ -152,9 +152,17 @@ def test_unsorted_can_go_anywhere_or_nowhere(home, tmp_path, monkeypatch):
 
 
 def test_wizard_points_at_the_setup_script_not_a_bare_command(monkeypatch):
-    for platform, script in [("win32", r".\setup.ps1 x-login"), ("linux", "./setup.sh x-login")]:
+    # cold read 2026-10-27: a bare .\setup.ps1 fails under Windows' default execution policy
+    for platform, script in [("win32", "powershell -ExecutionPolicy Bypass -File setup.ps1 x-login"),
+                             ("linux", "./setup.sh x-login")]:
         monkeypatch.setattr(onboard.sys, "platform", platform)
         assert onboard.setup_cmd("x-login") == script
+
+
+def test_note_cost_speaks_the_chosen_backend():
+    # cold read 2026-10-27: "2,000 Claude tokens each" matched neither the plan nor the API wording
+    assert "Claude plan" in app.note_cost({"notes_backend": "claude-code"})
+    assert "cent" in app.note_cost({"notes_backend": "anthropic-api"})
 
 
 def states(**broken):
@@ -189,6 +197,51 @@ def test_working_install_offers_changes_instead_of_rerunning(home, monkeypatch):
     answers(monkeypatch, "5", "")  # change topics, then done
     assert onboard.onboard({}) == 0
     assert ran == [5]
+
+
+def test_resumed_setup_still_offers_the_command(home, monkeypatch):
+    # cold read 2026-10-27: stopped after step 6, rerun, Enter: no `scatha` command and no offer of one
+    app.save_config({})
+    monkeypatch.setattr(onboard, "assess", lambda cfg: states())
+    offered = []
+    monkeypatch.setattr(onboard, "install_command", lambda: offered.append(1) or False)
+    answers(monkeypatch, "")
+    assert onboard.onboard({}) == 0
+    assert offered == [1]
+
+
+def test_a_failed_test_drive_is_not_all_set(home, monkeypatch, capsys):
+    # cold read 2026-10-27: "The test run stopped", then "All set." and exit 0
+    monkeypatch.setattr(onboard, "run_step", lambda n, *a: n != 7)
+    monkeypatch.setattr(onboard, "install_command", lambda: True)
+    assert onboard.onboard({}) == 1
+    out = capsys.readouterr().out
+    assert "test drive didn't work" in out and "All set." not in out
+    assert "scatha setup`, then type 7" in out
+
+
+def test_a_skipped_test_drive_is_still_all_set(home, monkeypatch, capsys):
+    monkeypatch.setattr(onboard, "run_step", lambda n, *a: None if n == 7 else True)
+    monkeypatch.setattr(onboard, "install_command", lambda: True)
+    assert onboard.onboard({}) == 0
+    assert "All set." in capsys.readouterr().out
+
+
+def test_step_test_reports_a_stopped_run(home, monkeypatch):
+    monkeypatch.setattr(onboard, "yes", lambda *a, **k: True)
+    monkeypatch.setattr(onboard.scheduler, "run_now", lambda args: 2)
+    assert onboard.step_test(app.load_config()) is False
+    monkeypatch.setattr(onboard.scheduler, "run_now", lambda args: 0)
+    assert onboard.step_test(app.load_config()) is True
+    monkeypatch.setattr(onboard, "yes", lambda *a, **k: False)
+    assert onboard.step_test(app.load_config()) is None
+
+
+def test_command_installed_in_another_terminal_is_not_offered_again(tmp_path, monkeypatch):
+    monkeypatch.setattr(onboard.shutil, "which", lambda name: None)
+    monkeypatch.setattr(onboard, "installed_source", lambda: tmp_path / "router")
+    monkeypatch.setattr(onboard, "yes", lambda *a, **k: pytest.fail("asked again"))
+    assert onboard.install_command()
 
 
 def test_first_run_goes_through_every_step(home, monkeypatch):

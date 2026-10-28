@@ -87,7 +87,7 @@ Type `scatha run`. Useful options:
 
 The log lands in `~/.scatha/work/logs/` either way.
 
-To run it exactly the way the scheduler does (a fresh window, the scheduler's settings), run the scheduled script itself: `& "$HOME\.scatha\run.ps1"` on Windows, or `~/.scatha/run.sh` on macOS and Linux. The same options work there.
+To run it exactly the way the scheduler does (a fresh window, the scheduler's settings), run the scheduled script itself: `powershell -ExecutionPolicy Bypass -File "$HOME\.scatha\run.ps1"` on Windows, or `~/.scatha/run.sh` on macOS and Linux. The same options work there.
 
 ## 4. When nothing fits: Unsorted, the desk, and discovery
 
@@ -108,7 +108,7 @@ The desk opens on two kinds of bookmarks:
 - **Unsorted ones,** waiting for a topic.
 - **Close calls,** where two topics scored almost the same, or where the best score sits near the keep line.
 
-For each one, click the topic it belongs in, **Don't Keep**, or **Not Sure**. Each click is saved right away (in `tuning/verdicts.json`); anything you don't click doesn't count. Keyboard: `j`/`k` to move, `1`-`9` for a topic, `0` for **Don't Keep**, `u` for **Not Sure**.
+For each one, click the topic it belongs in, **Don't Keep**, or **Not Sure**. **Don't Keep** means you don't want it; if it's worth keeping but no topic fits, skip it, so `scatha discover` can still find it a topic. Each click is saved right away (in `tuning/verdicts.json`); anything you don't click doesn't count. Keyboard: `j`/`k` to move, `1`-`9` for a topic, `0` for **Don't Keep**, `u` for **Not Sure**.
 
 When you press **Done**, the desk offers to write full notes for anything you sorted out of Unsorted, and to remove the light notes you marked **Don't Keep**.
 
@@ -139,7 +139,7 @@ For each idea that holds up, pick **Add**, **Not for Me** (never suggested again
 
 1. You name it and pick its folder: a new folder in one of your vaults, a folder another topic already uses, or any folder you type in. (A folder outside every Obsidian vault gets a warning, since Obsidian won't show those notes.)
 2. Scatha adds it to `topics.yaml` (keeping a copy of the old file in `tuning/`) and updates every note's topic list.
-3. It offers to write full notes for the bookmarks it rescues from Unsorted, at about 2,000 Claude tokens each.
+3. It offers to write full notes for the bookmarks it rescues from Unsorted (what that costs: [section 8](#8-costs-and-limits)).
 
 Filed notes never move. If some fit the new topic better, the report says so, and their topic lists include it.
 
@@ -233,7 +233,7 @@ Start with `scatha setup status`. It checks every step, tests the three logins l
 | Jev errors (401/403) | Your TypeSafe key was revoked or ran out of credit | Run `scatha setup`. It finds the rejected key and asks for a new one |
 | A topic folder stays empty | Its definition is too narrow, or you don't bookmark much of it | Check the scores in `routes.md`, and widen `yes_means` |
 | Notes landed but Obsidian doesn't show them | The topic's folder isn't inside an Obsidian vault | Move the folder into a vault, then update that topic's `destination` in `topics.yaml` |
-| `setup status` says some secrets are plain environment variables | They were saved by an earlier version | `scatha setup secrets` ([section 6](#secrets)) |
+| `scatha setup status` says some secrets are plain environment variables | They were saved by an earlier version | `scatha setup secrets` ([section 6](#secrets)) |
 
 ## 8. Costs and limits
 

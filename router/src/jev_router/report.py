@@ -270,7 +270,7 @@ def text(cfg: dict) -> str:
     lines = [app.DISPLAY_NAME, ""] + (stop_lines(s["stop"]) + [""] if s["stop"] else []) + [last_run_line(s)]
     if s["mode"] != "off":
         lines.append(f"Unsorted now: {_n(s['unsorted'], 'bookmark')}, in {s['unsorted_dir']}" if s["unsorted"]
-                     else "Unsorted is empty: every bookmark found a topic.")
+                     else "Unsorted is empty.")
     if not_kept_line(s):
         lines.append(not_kept_line(s))
     if s["remaining"]:
@@ -311,7 +311,7 @@ def note(cfg: dict) -> str:
             if s["unsorted"] > len(newest):
                 out.append(f"- …and {s['unsorted'] - len(newest)} more in `{s['unsorted_dir'].name}/`")
         else:
-            out += ["", "Unsorted is empty: every bookmark found a topic."]
+            out += ["", "Unsorted is empty."]
         out += ["", f"Delete an Unsorted note you don't want, and {app.DISPLAY_NAME} will count it as not worth keeping."]
     if not_kept_line(s):
         out += ["", not_kept_line(s)]

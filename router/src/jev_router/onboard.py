@@ -263,8 +263,9 @@ def step_x(cfg: dict, verify: bool = True) -> bool:
     say(f"  {app.DISPLAY_NAME} reads your bookmarks through your X login in the browser. It needs two cookies:")
     say()
     say("    1. In your browser, open x.com and log in.")
-    say("    2. Press F12 to open the developer tools.")
-    say("    3. Go to Application (Storage in Firefox) → Cookies → https://x.com")
+    say("    2. Press F12 to open the developer tools. (If nothing opens, right-click the page and pick Inspect.)")
+    say("    3. Click the Application tab (Storage in Firefox). If you don't see it, click » at the top first.")
+    say("       Then open Cookies → https://x.com")
     say("    4. Find the rows named auth_token and ct0. You will paste each row's Value below.")
     say()
     hint("Treat these cookies like a password: they unlock your X account.")
@@ -584,6 +585,8 @@ def install_command() -> bool:
     if shutil.which(app.APP_NAME):
         repair_command()
         return True
+    if installed_source() is not None:
+        return True  # installed earlier; this terminal just hasn't seen the new PATH yet
     say()
     question(f"Install the `{app.APP_NAME}` command?")
     hint(f"With it, you can type `{app.APP_NAME}` in any folder to see what the last runs did and what "
@@ -662,9 +665,10 @@ def step_reader(cfg: dict, preset: str | None = None) -> None:
     app.save_config(cfg)
 
 
-def step_test(cfg: dict) -> None:
+def step_test(cfg: dict) -> bool | None:
+    """True if the test run worked, False if it stopped, None if the user skipped it."""
     if not yes("Try it now on your 5 newest bookmarks? The notes will go to a preview folder, outside your vaults."):
-        return
+        return None
     hint("Running the scheduled script in a new shell, the same way the scheduler will (a minute or two)…")
     code = scheduler.run_now(["--preview", "--batch", "5", "--force"])
     logs = sorted((app.work() / "logs").glob("*.log"))
@@ -676,9 +680,10 @@ def step_test(cfg: dict) -> None:
     if code:
         bad(f"The test run stopped (exit code {code}). To see why, open the log: "
             f"{logs[-1] if logs else app.work() / 'logs'}")
-        return
+        return False
     ok(f"The scheduled script works. Preview notes: {app.work() / 'notes-preview'}")
     hint(f"{app.DISPLAY_NAME} didn't record these bookmarks, so the first real run will pick them up again.")
+    return True
 
 
 # ---------- where things stand ----------
@@ -744,7 +749,8 @@ def show_recap(states: dict[int, tuple[bool, str]]) -> None:
         say(f"    {mark} {n}  {STEPS[n].ljust(width)}  {detail if good else red(detail)}")
 
 
-def run_step(n: int, cfg: dict, answers: dict, verify: bool) -> bool:
+def run_step(n: int, cfg: dict, answers: dict, verify: bool) -> bool | None:
+    """Steps 1-6: True if the step worked. Step 7 (the test drive): see step_test."""
     heading(n, len(STEPS), STEPS[n])
     if n == 1:
         good = step_prereqs(cfg)
@@ -765,8 +771,7 @@ def run_step(n: int, cfg: dict, answers: dict, verify: bool) -> bool:
     if n == 6:
         step_ntfy(cfg, answers.get("ntfy_topic"))
         return step_schedule(cfg, answers.get("schedule"), answers.get("batch_size"))
-    step_test(cfg)
-    return True
+    return step_test(cfg)
 
 
 # ---------- commands ----------
@@ -880,16 +885,22 @@ def onboard(answers: dict, verify: bool = True) -> int:
         if not todo:
             say()
             ok("Everything works.")
+            install_command()  # a setup stopped before the last question never offered it
             return change_menu(cfg, answers, verify)
         say()
         say(f"  Picking up at step {todo[0]} ({STEPS[todo[0]]}). Steps marked ✓ stay as they are.")
     for n in todo:
         if not run_step(n, cfg, answers, verify):
             return 1
-    run_step(7, cfg, answers, verify)
+    tested = run_step(7, cfg, answers, verify)
     installed = install_command()
     say()
-    say(cyan("All set."))
+    if tested is False:
+        say(yellow("Setup is done, but the test drive didn't work."))
+        say("  The scheduled runs will probably stop the same way. Check the log above.")
+        say(f"  To try again, type `{app.APP_NAME + ' setup' if installed else setup_cmd()}`, then type 7.")
+    else:
+        say(cyan("All set."))
     say("  Handy later" + ("" if installed else f", from {app.REPO}") + ":")
     say()
     c = (lambda sub: f"{app.APP_NAME} {sub}".strip()) if installed else (lambda sub: app.command(sub))
@@ -901,7 +912,7 @@ def onboard(answers: dict, verify: bool = True) -> int:
     ])
     say()
     hint(f"The runbook covers the rest: {app.REPO / 'docs' / 'RUNBOOK.md'}")
-    return 0
+    return 1 if tested is False else 0
 
 
 def change_menu(cfg: dict, answers: dict, verify: bool) -> int:

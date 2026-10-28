@@ -66,8 +66,17 @@ def task_name() -> str:
 
 
 def setup_command(sub: str = "") -> str:
-    """How the user runs setup on this OS, from the project folder (there is no command on PATH)."""
-    return ((r".\setup.ps1" if sys.platform == "win32" else "./setup.sh") + f" {sub}").rstrip()
+    """How the user runs setup on this OS, from the project folder (there is no command on PATH).
+    Windows gets the README's form: a bare .\\setup.ps1 fails where scripts are disabled (the default)."""
+    script = "powershell -ExecutionPolicy Bypass -File setup.ps1" if sys.platform == "win32" else "./setup.sh"
+    return f"{script} {sub}".rstrip()
+
+
+def note_cost(cfg: dict) -> str:
+    """What full notes cost, in the terms of the chosen backend (the README's measured figures)."""
+    if cfg.get("notes_backend") == "anthropic-api":
+        return "Haiku writes them, roughly a cent each on your API key"
+    return "Haiku writes them on your Claude plan, about a quarter of a 5-hour window per 100 notes"
 
 
 def command(sub: str = "") -> str:

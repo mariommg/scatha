@@ -214,6 +214,15 @@ async def score(bookmarks: dict[str, dict], tax: Taxonomy) -> list:
     return await Router(tax).route_many(items)
 
 
+def cached_deck(cfg: dict) -> dict | None:
+    """The desk as last built, if it was scored against the current topics. Costs nothing."""
+    if not deck_path().exists():
+        return None
+    deck = json.loads(deck_path().read_text(encoding="utf-8"))
+    tax = Taxonomy.load(app.taxonomy_path(cfg))
+    return deck if deck.get("topics_hash") == desk.topics_hash(topic_list(tax)) else None
+
+
 def build(cfg: dict, say=print, reuse: bool = False) -> dict:
     """Score every processed bookmark. reuse=True keeps the scores already on the desk (same topics)
     and scores only bookmarks processed since, so opening the desk after a run costs pennies or nothing."""
@@ -304,7 +313,7 @@ def finish_sorting(cfg: dict, say=print, ask=None) -> int:
             light[i].unlink(missing_ok=True)
         say(f"  Removed {_n(len(to_remove), 'light note')}.")
     if to_write and ask(f"Write full notes for the {_n(len(to_write), 'bookmark')} you sorted out of Unsorted? "
-                        "(Haiku writes them, about 2,000 Claude tokens each.)"):
+                        f"({app.note_cost(cfg)}.)"):
         done = write_up(cfg, to_write, say)
     report.write_note(cfg)
     return done
