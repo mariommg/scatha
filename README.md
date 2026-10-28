@@ -6,7 +6,7 @@
   <img src="assets/scatha.png" alt="A white dragon standing atop a lightly sketched hoard" width="100%">
 </p>
 
-*Your X bookmarks, sorted into topics you choose and written up as notes in Obsidian (or any folder), on a schedule.*
+***Your X bookmarks, sorted into topics you choose and written up as notes in Obsidian (or any folder), on a schedule.***
 
 I had 443 bookmarks on X going back to 2018. I had read approximately none of them twice.
 
