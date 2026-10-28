@@ -124,7 +124,7 @@ Stopped partway? Run the same line again. Setup remembers your answers and picks
 
 ## Getting started on macOS or Linux
 
-1. Install [Node.js](https://nodejs.org/) 22 or newer, [uv](https://docs.astral.sh/uv/getting-started/installation/), and [Claude Code](https://claude.com/claude-code). Run `claude` once and log in.
+1. Install [Node.js](https://nodejs.org/) 22 or newer, [uv](https://docs.astral.sh/uv/getting-started/installation/), and [Claude Code](https://claude.com/claude-code) (_skip if you're using Anthropic's API). Run `claude` once and log in.
 2. Download Scatha (the green **Code** button, then **Download ZIP**, or `git clone https://github.com/mariommg/scatha.git`). Unzip it somewhere permanent: the folder *is* the program, and the schedule runs it from there.
 3. Open a terminal in the Scatha folder. (macOS: in Finder, right-click the folder and choose **Services → New Terminal at Folder**.)
 4. Optional: plan your topics in `docs/onboarding.html`, which saves `my-setup.json` to your Downloads folder.
@@ -180,7 +180,7 @@ Some things it can't see, so it can't sort them well. Knowing them saves you fro
 
 ## When something breaks
 
-`setup setup status` checks every step, including the logins, and points at the newest log. Running `scatha setup` again fixes whatever it finds broken.
+`scatha setup status` checks every step, including the logins, and points at the newest log. Running `scatha setup` again fixes whatever it finds broken.
 
 If a scheduled run can't reach X, Jev, or Claude, it stops before fetching. Its log (and phone ping, if you set one up) says what to fix. [docs/RUNBOOK.md](docs/RUNBOOK.md) covers the rest: expired X logins, changing topics, running it right now, and costs.
 
