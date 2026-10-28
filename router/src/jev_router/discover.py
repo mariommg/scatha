@@ -388,7 +388,7 @@ def decide_each(cfg: dict, result: dict, ui) -> int:
         added += 1
         unsorted_ids = [i for i in c["rescued"] if led.get(i, {}).get("status") == "skip"]
         if unsorted_ids and ui.yes(f"Write full notes into {dest} for the {_n(len(unsorted_ids), 'bookmark')} "
-                                   "it rescues from Unsorted? (Haiku writes them, about 2,000 Claude tokens each.)"):
+                                   f"it rescues from Unsorted? ({app.note_cost(cfg)}.)"):
             review.write_up(cfg, {i: key for i in unsorted_ids}, ui.say)
         if moved := len(c["moves"]):
             their = "its" if moved == 1 else "their"

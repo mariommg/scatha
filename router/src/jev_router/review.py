@@ -313,7 +313,7 @@ def finish_sorting(cfg: dict, say=print, ask=None) -> int:
             light[i].unlink(missing_ok=True)
         say(f"  Removed {_n(len(to_remove), 'light note')}.")
     if to_write and ask(f"Write full notes for the {_n(len(to_write), 'bookmark')} you sorted out of Unsorted? "
-                        "(Haiku writes them, about 2,000 Claude tokens each.)"):
+                        f"({app.note_cost(cfg)}.)"):
         done = write_up(cfg, to_write, say)
     report.write_note(cfg)
     return done

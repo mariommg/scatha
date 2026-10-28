@@ -152,9 +152,17 @@ def test_unsorted_can_go_anywhere_or_nowhere(home, tmp_path, monkeypatch):
 
 
 def test_wizard_points_at_the_setup_script_not_a_bare_command(monkeypatch):
-    for platform, script in [("win32", r".\setup.ps1 x-login"), ("linux", "./setup.sh x-login")]:
+    # cold read 2026-10-27: a bare .\setup.ps1 fails under Windows' default execution policy
+    for platform, script in [("win32", "powershell -ExecutionPolicy Bypass -File setup.ps1 x-login"),
+                             ("linux", "./setup.sh x-login")]:
         monkeypatch.setattr(onboard.sys, "platform", platform)
         assert onboard.setup_cmd("x-login") == script
+
+
+def test_note_cost_speaks_the_chosen_backend():
+    # cold read 2026-10-27: "2,000 Claude tokens each" matched neither the plan nor the API wording
+    assert "Claude plan" in app.note_cost({"notes_backend": "claude-code"})
+    assert "cent" in app.note_cost({"notes_backend": "anthropic-api"})
 
 
 def states(**broken):

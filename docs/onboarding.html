@@ -146,8 +146,9 @@ td:first-child { width: 42%; }
       <div class="field"><label for="batch">Bookmarks per run</label><input type="number" id="batch" min="5" max="500" step="5" value="100"></div>
       <div class="field"><label for="ntfy">Phone ping via ntfy (optional topic)</label><input type="text" id="ntfy" placeholder="something-hard-to-guess"></div>
     </div>
+    <p class="muted">ntfy is a free phone app for notifications. Install it from <a href="https://ntfy.sh">ntfy.sh</a>, subscribe to a topic name nobody would guess, and type the same name here. After each run, you'll get a line like "Bookmark import: 23 new notes (14 AI, 9 Humor)." Leave it blank to skip.</p>
     <p class="sentence" id="sentence"></p>
-    <p class="muted">Got a big backlog? Each run takes up to that many bookmarks Scatha hasn't read yet, newest first, so the backlog goes down one batch per run. (Scatha reads your newest 1,000 bookmarks; older ones won't come through yet.) The computer needs to be on with you logged in, but a locked screen is fine. If it's asleep, it wakes up for the run. If it's off, the run happens at your next login.</p>
+    <p class="muted">Got a big backlog? Each run takes up to that many bookmarks Scatha hasn't read yet, newest first, so the backlog goes down one batch per run. (Scatha reads your newest 1,000 bookmarks; older ones won't come through yet.) The computer needs to be on with you logged in, but a locked screen is fine. <span id="wakeNote"></span></p>
   </section>
 
   <section class="sheet" aria-labelledby="h5s">
@@ -362,6 +363,11 @@ td:first-child { width: 42%; }
     $("#cmdNote").textContent = `Open ${where}, paste this line, and press Enter. Leave my-setup.json in Downloads: ` +
       "the setup wizard reads it once, and you can delete it afterward. (If your browser saves downloads somewhere else, change that part of the line.)" +
       (state.os === "mac" ? " One warning: the macOS path is written to spec and has never run, because I don't have a Mac. If you're the first, tell me how it went." : "");
+    // What each scheduler does about a sleeping or switched-off computer (scheduler.py)
+    $("#wakeNote").textContent = {
+      win: "If it's asleep, it wakes up for the run. If it's off, the run happens at your next login.",
+      mac: "If it's asleep, the run happens when it wakes up. If it's off, that run is skipped.",
+      linux: "It won't wake the computer. If it's asleep or off, the run happens soon after it's back on and you're logged in." }[state.os];
     document.querySelectorAll(".os button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.os === state.os)));
   }
   document.querySelectorAll(".os button").forEach(b => b.addEventListener("click", () => { state.os = b.dataset.os; save(); }));

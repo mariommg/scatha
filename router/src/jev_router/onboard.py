@@ -260,14 +260,13 @@ def step_prereqs(cfg: dict) -> bool:
 
 
 def step_x(cfg: dict, verify: bool = True) -> bool:
-    say(f"  {app.DISPLAY_NAME} reads your bookmarks through your X login in the browser. It needs two cookies")
-    say("  (small pieces of that login, saved by your browser):")
+    say(f"  {app.DISPLAY_NAME} reads your bookmarks through your X login in the browser. It needs two cookies:")
     say()
     say("    1. In your browser, open x.com and log in.")
     say("    2. Press F12 to open the developer tools. (If nothing opens, right-click the page and pick Inspect.)")
     say("    3. Click the Application tab (Storage in Firefox). If you don't see it, click » at the top first.")
     say("       Then open Cookies → https://x.com")
-    say("    4. Find the rows named auth_token and ct0. Double-click each Value, press Ctrl+C, then paste it below.")
+    say("    4. Find the rows named auth_token and ct0. You will paste each row's Value below.")
     say()
     hint("Treat these cookies like a password: they unlock your X account.")
     hint(f"They stop working when you log out of X. If that happens, type:  {setup_cmd('x-login')}")
