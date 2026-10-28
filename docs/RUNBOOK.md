@@ -108,7 +108,7 @@ The desk opens on two kinds of bookmarks:
 - **Unsorted ones,** waiting for a topic.
 - **Close calls,** where two topics scored almost the same, or where the best score sits near the keep line.
 
-For each one, click the topic it belongs in, **Don't Keep**, or **Not Sure**. Each click is saved right away (in `tuning/verdicts.json`); anything you don't click doesn't count. Keyboard: `j`/`k` to move, `1`-`9` for a topic, `0` for **Don't Keep**, `u` for **Not Sure**.
+For each one, click the topic it belongs in, **Don't Keep**, or **Not Sure**. **Don't Keep** means you don't want it; if it's worth keeping but no topic fits, skip it, so `scatha discover` can still find it a topic. Each click is saved right away (in `tuning/verdicts.json`); anything you don't click doesn't count. Keyboard: `j`/`k` to move, `1`-`9` for a topic, `0` for **Don't Keep**, `u` for **Not Sure**.
 
 When you press **Done**, the desk offers to write full notes for anything you sorted out of Unsorted, and to remove the light notes you marked **Don't Keep**.
 
